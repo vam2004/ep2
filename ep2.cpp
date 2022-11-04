@@ -13,6 +13,14 @@ namespace LineReader {
 		size_t amount; // the number of files to be readed
 		bool alive; // indicates if the iteration doesn't ended
 	};
+	// prototypes
+	void finalizeFileState(LineReader* state);
+	bool nextFileState(LineReader* state);
+	void finalizeFileState(LineReader* state);
+	void nextFile(LineReader* state);
+	bool checkNextFile(const LineReader* state);
+	void createState(LineReader* state, const char** filenames, const size_t amount);
+	bool nextLine(LineReader* state, std::string& buffer);
 	/*
 	Change the actual file begin readed in lineReader
 	[Warnings]:
@@ -37,7 +45,7 @@ namespace LineReader {
 	[warnings]:
 	(2) The "source" field shall be always a type-valid heap-allocated adress or nullptr. Otherwise, it will cause heap corruption.
 	*/
-	void finalizeFileState(lineReader* state) {
+	void finalizeFileState(LineReader* state) {
 		if(state->source != nullptr) { // non-poisoned state
 			state->source->close(); // close the underlaying stream
 			delete state->source;
@@ -112,7 +120,7 @@ namespace LineReader {
 					}
 				} else { // posoined state
 					std::cout << "Invalid Input" << std::endl; // send a error message
-					finalizeFileState(state); // finalize the posoined state
+					finalizeFileState(&state); // finalize the posoined state
 					break; // stop iteration
 				}
 				nextFile(&state); // goto next file
@@ -137,7 +145,7 @@ namespace OrdenedLinkedMap {
 		0, if the left element is equal to right element
 		1, if the left element is greater than right
 	*/
-	typedef int cmp_fn(void*, void*);
+	using cmp_fn = int (*)(void*, void*);
 	/*
 	The node in the linked ordened map
 	*/
@@ -146,14 +154,16 @@ namespace OrdenedLinkedMap {
 		void* value; // the value begin referencied
 		Node* prev; // previuos node in the ordened linked map
 		Node* next; // next node in the ordened linked map
-	}/*
+	};
+	/*
 	The entry point of linked ordened map
 	*/
 	struct OrdenedLinkedMap {
 		Node* first; // the first node in the ordened map
 		Node* last; // the last node in the ordened map
+		size_t size;
 		cmp_fn compare; // trampoline: the function used for comparing
-	}
+	};
 	/*
 	The result of partialSearch().
 	*/
@@ -161,20 +171,58 @@ namespace OrdenedLinkedMap {
 		Node* lt; // the node that is lesser than the target (nullptr if not exists)
 		Node* eq; // the node that is equal to the target (nullptr if not exists)
 		Node* gt; // the node that is great than the target (nullptr if not exists)
-	}
+	};
 	/*
 	Insert a element in the left side of another.
+	[warnings]:
+		(1) Position shall not be null
 	*/
-	void insert_left(OrdenedLinkedList* list, Node* element, Node* at) {
-		
+	void insert_left(OrdenedLinkedMap* list, Node* element, Node* position) {
+		Node* previuos = position->prev; // previuos node of "position"
+		element->next = position; // previous <-> element <-> position
+		element->prev = previuos;
+		if(previuos != nullptr) {
+			previuos->next = element;
+		} else {
+			list->first = element;
+		}	
+		position->prev = element;
 	}
 	/*
-	Insert a element in the right side of another.
+	Insert a element in the right side of another. 
+	[warnings]:
+		(1) Position shall not be null
 	*/
-	void insert_right(OrdenedLinkedList* list, Node* element, Node* at) {
-		
+	void insert_right(OrdenedLinkedMap* list, Node* element, Node* position) {
+		Node* next = position->next; // next node of "position"
+		element->next = next; // position <-> element <-> next
+		element->prev = position;
+		if(next != nullptr) {
+			next->next = element;
+		} else {
+			list->last = element;
+		}
+		position->next = element;
 	}
-	SearchInterval partial_find(OrdenedLinkedList* list, void* key) {
+	void insert_first(OrdenedLinkedMap* list, Node* element) {
+		Node* first = list->first;
+		if(first == nullptr) {
+			list->first = element;
+			list->last = element;
+		} else {
+			insert_left(list, element, first);
+		}
+	}
+	void insert_last(OrdenedLinkedMap* list, Node* element) {
+		Node* last = list->last;
+		if(last == nullptr) {
+			list->last = element;
+			list->first = element;
+		} else {
+			insert_right(list, element, last);
+		}
+	}
+	SearchInterval partial_find(OrdenedLinkedMap* list, void* key) {
 		/*
 		The target is the node the first node that key field is equal to "key"
 		A candidate is a node that could be the target. Exists up to one candidate, because the fields's value of all nodes after the first candidate are greater than key, and, therefore, all subsequent nodes aren't candidates.
@@ -200,14 +248,14 @@ namespace OrdenedLinkedMap {
 		if(pre == nullptr) { // The list is empty
 			return state; // {lt: nullptr, eq: nullptr, gt: nullptr}
 		} 
-		state->lt = prev; // The list is not empty
+		state.lt = pre; // The list is not empty
 		if (now == nullptr) { // Reached the end
 			return state; // {lt: prev, eq: nullptr, gt: nullptr}
 		}
 		if(cmp == 1) { // The target was found
-			state->eq = now; // {lt: prev, eq: gt, gt: nullptr}
+			state.eq = now; // {lt: prev, eq: gt, gt: nullptr}
 		} else { // The target wasn't found
-			state->gt = now; // {lt: prev, eq: nullptr, gt: now}
+			state.gt = now; // {lt: prev, eq: nullptr, gt: now}
 		}
 		return state;
 	}
@@ -220,8 +268,61 @@ namespace OrdenedLinkedMap {
 	/*
 	Atomically returns a node that contains the element, if exists; or create and returns a new node, if not exists.
 	*/
-	Node* find_or_create(OrdenedLinkedList* list, void* key) {
+	Node* find_or_create(OrdenedLinkedMap* list, void* key) {
 		return nullptr;
+	}
+	namespace test {
+		void printmap_left_int(OrdenedLinkedMap* list);
+		void printmap_right_int(OrdenedLinkedMap* list);
+		int compare_int(void* left, void* right) {
+			int ileft = *((int*) left);
+			int iright = *((int*) left);
+			if(ileft < iright)
+				return -1;
+			if(ileft == iright)
+				return 0;
+			return 1;
+		}
+		void test_insertion() {
+			int left_keys[] = {10, 15, 16, 97, -113, 48};
+			int left_values[] = {20, 82, -72, 37, 51, 45};
+			int right_keys[] = {0, 80, 59, 68, 31, 56};
+			int right_values[] = {0, 79, 53, 111, -7, 83};
+			OrdenedLinkedMap list = {nullptr, nullptr, 0, compare_int};
+			for(size_t i = 0; i < 6; i++) {
+				Node* data = new Node;
+				data->key = (void*) (left_keys + i);
+				data->value = (void*) (left_values + i);
+				data->next = nullptr;
+				data->prev = nullptr;
+				insert_first(&list, data);
+			}
+			for(size_t i = 0; i < 6; i++) {
+				Node* data = new Node;
+				data->key = (void*) (right_keys + i);
+				data->value = (void*) (right_values + i);
+				data->next = nullptr;
+				data->prev = nullptr;
+				insert_last(&list, data);
+			}
+			printmap_left_int(&list);
+			std::cout << std::endl;
+			printmap_right_int(&list);
+		}
+		void printnode(Node* src){
+			std::cout << "key=" << *((int*) src->key) << " ";
+			std::cout << "value=" << *((int*) src->value) << std::endl;
+		}
+		void printmap_left_int(OrdenedLinkedMap* list) {
+			for(Node* now = list->first; now != nullptr; now = now->next) {
+				printnode(now);
+			}
+		}
+		void printmap_right_int(OrdenedLinkedMap* list) {
+			for(Node* now = list->last; now != nullptr; now = now->prev) {
+				printnode(now);
+			}
+		}
 	}
 }
 int main() {
@@ -229,6 +330,7 @@ int main() {
 	filenames[0] = "test1.txt";
 	filenames[1] = "test2.txt";
 	filenames[3] = "test3.txt";
-	LineReader::test::test(filenames, 2);	
+	LineReader::test::test(filenames, 2);
+	OrdenedLinkedMap::test::test_insertion();
 	return 0;
 }
