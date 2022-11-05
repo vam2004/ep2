@@ -1,130 +1,115 @@
 #include <iostream>
-#include <fstream>
+#include <stdio.h>
 #include <string>
 // encapuslate lineReader into a namespace
 namespace LineReader {
-	/*
-	* Represent the state of iterator	
-	*/
 	struct LineReader {
 		const char** filenames; // the names of files to be readed
-		std::ifstream* source;  // the state of actual file begin readed
+		FILE* source;  // the state of actual file begin readed
 		size_t fileid;  // the index of actual file into filenames
 		size_t amount; // the number of files to be readed
-		bool alive; // indicates if the iteration doesn't ended
+		bool alive;
 	};
 	// prototypes
-	void finalizeFileState(LineReader* state);
-	bool nextFileState(LineReader* state);
-	void finalizeFileState(LineReader* state);
-	void nextFile(LineReader* state);
-	bool checkNextFile(const LineReader* state);
-	void createState(LineReader* state, const char** filenames, const size_t amount);
-	bool nextLine(LineReader* state, std::string& buffer);
+	const char* get_filename(const LineReader* state);
+	bool open_file(LineReader* state);
+	void close_file(LineReader* state);
+	void next_file(LineReader* state);
+	bool isgood(const LineReader* state);
+	bool isalive(const LineReader* state);
+	bool check_state(const LineReader* state);
+	void create(LineReader* state, const char** filenames, const size_t amount);
 	/*
-	Change the actual file begin readed in lineReader
+	Returns the pointer to name of actual file.
 	[Warnings]:
-		(1) The "fileid", "amount" and "filenames" fields needs to be properly initialize before calling.
-		(2) The stream's failbit shall be tested after calling, maybe using checkNextFile(). 
-		
-	For futher information, see:
-		- https://cplusplus.com/reference/fstream/ifstream/ifstream/
-		- https://cplusplus.com/reference/ios/ios_base/iostate/
-		- https://cplusplus.com/reference/ios/ios_base/openmode/
+		(1) It shall be called only once the iterator is alive. Otherwise it could be undefined behavior.
 	*/
-	bool nextFileState(LineReader* state) {
-		const char* filename; 
-		if(state->fileid >= state->amount)
-			return false; // stop interation
-		filename = state->filenames[state->fileid]; // take a reference to name of the next file
-		state->source = new std::ifstream(filename); // construct a new file (default open mode: std::ios::in)
-		return true; // continue interation
+	const char* get_filename(const LineReader* state) {
+		return state->filenames[state->fileid];
 	}
 	/*
-	Finalizes the previuos file source
-	[warnings]:
-	(2) The "source" field shall be always a type-valid heap-allocated adress or nullptr. Otherwise, it will cause heap corruption.
+	Tries the actual state's fully initialization. Returns a boolean value indicating that iteration still alive
+	[Warnings]:
+		(1) Inherits the warning (1) from get_filename().
+		(2) The "fileid", "amount" and "filenames" fields needs to be properly initialize before calling.
 	*/
-	void finalizeFileState(LineReader* state) {
-		if(state->source != nullptr) { // non-poisoned state
-			state->source->close(); // close the underlaying stream
-			delete state->source;
-			state->source = nullptr;
+	
+	bool open_file(LineReader* state) {
+		if(state->fileid >= state->amount)
+			return false; // stop interation
+		state->source = fopen(get_filename(state), "r"); // open the file in read mode
+		return true; // constinue iteration
+	}
+	/*
+	Finalizes the previuos state, closing the underlaying file (if wasn't closed).
+	[Warnings]:
+		(1) The "source" field should be always either a valid file or NULL.
+	*/
+	void close_file(LineReader* state) {
+		if(state->source != NULL) { // non-poisoned state
+			fclose(state->source); // close the underlaying file
+			state->source = NULL; // set to null to avoid reuse
 		}
 	}
 	/*
-	Finalizes the previuos file source, and create a new file source.
+	Finalizes the previuos state and advances to next state. 
 	[Warnings]:
-		- Inherits warnings (1) and (2) from nextFileState()
-		- Inherits warning (1) from finalizeFileState()
-		(1) The state shall be initialized before calling
-	For futher information, see:
-	- https://cplusplus.com/reference/fstream/ifstream/close/
+		(1) Inherits warnings (1) and (2) from open_file()
+		(2) Inherits warning (1) from close_file()
 	*/
-	void nextFile(LineReader* state) {
-		state->fileid++; // inclement the index of file
-		finalizeFileState(state); // finalizes the previuos state
-		state->alive = nextFileState(state); // create a new state
+	void next_file(LineReader* state) {
+		close_file(state); // close the previuos file (only after first iteration)
+		state->fileid++;
+		state->alive = open_file(state); // update "alive" field, which indicate if iteration is alive
 	}
 	/*
-	Check state of underlaying stream, and returns:
-	- false, if the actual source file was the failbit and badbit set.
+	check if iteration is alive and the actual state was sucessful initialized
+	*/
+	bool isgood(const LineReader* state) {
+		return state->alive && check_state(state); // returns a boolean value indicating if the iteration is alive and the actual state was sucessful initialized.
+	}
+	/*
+	check if iteration is alive
+	*/
+	bool isalive(const LineReader* state) {
+		return state->alive;
+	}
+	/*
+	Check state of underlaying file, and returns:
+	- false, if the actual source file pointer is NULL
 	- true, otherwise.
-	[Warnings]:
-		(1) It should called in the very after nextFile() to avoid race conditions, aka TOCTOU. 
-
-	For futher information, see:
-	- https://en.wikipedia.org/wiki/Time-of-check_to_time-of-use
 	*/
-	bool checkNextFile(const LineReader* state) {
-		if(state->source->bad()) // check if bad bit is set
-			return false; // the stream was poisoned
-		if(state->source->fail()) // check if failbit is set
-			return false; // the stream was poisoned
-		return true; // sucess
+	bool check_state(const LineReader* state) {
+		return state->source != NULL; 
 	}
 	/*
-	Initialize the state of struct lineReader.
+	Properly initialize the state of iterator.
 	[warnings]:
-		- Inherits warning (2) from nextFileState().
+		(1) It will override all fields of state. So make sure for properly finalizing it, if the struct LineReader was reused. 
 	*/
-	void createState(LineReader* state, const char** filenames, const size_t amount) {
+	void create(LineReader* state, const char** filenames, const size_t amount) {
 		state->fileid = 0; // its is "filenames" associted index, therefore starts with 0
 		state->amount = amount; // the size of "filenames"
 		state->filenames = filenames; 
-		state->source = nullptr; // init as nullptr (null-initialization warranty)
-		state->alive = nextFileState(state); // initialize actual file
-	}
-	/*
-	read a whole line into "buffer" from the actual stream in "state". Returns a boolean value representing if the stream wasn't ended or poisoned.
-	[warnings]:
-		(1) The "state" shall be alive (the iteration wasn't ended)
-		(2) If the stream was poisoned or ended, then acessing "buffer" is a undefined behaviour
-	*/
-	bool nextLine(LineReader* state, std::string& buffer) {
-		std::ifstream* source = state->source; // cast source field into (std::ifstream*)
-		return std::getline(*source, buffer).good(); // call std::getline and returns a representing if the stream wasn't ended or poisoned (failbit, badbit and eofbit aren't setted)
+		state->source = NULL; // init as NULL (warning (1) from close_file())
+		state->alive = open_file(state); // update "alive" field, which indicate if iteration is alive
 	}
 	// use a namespace to encapsulate the testing suit
 	namespace test {
 		void printFilename(const LineReader* state);
-		void test(const char** filenames, const size_t amount){
+		void test(const char** names, const size_t amount){
 			LineReader state; // the state machine
 			std::string line; // the buffer
-			createState(&state, filenames, amount); // initialize the state machine
-			while(state.alive) { // validate if iterator ended
-				printFilename(&state); // print the name of actual file
-				if(checkNextFile(&state)) { // validate the state
-					while(nextLine(&state, line)) { // read a line from actual file
-						std::cout << line << std::endl; // print the line
-					}
-				} else { // posoined state
-					std::cout << "Invalid Input" << std::endl; // send a error message
-					finalizeFileState(&state); // finalize the posoined state
-					break; // stop iteration
-				}
-				nextFile(&state); // goto next file
-			}
+			for(create(&state, names, amount); isgood(&state); next_file(&state)) {
+				printFilename(&state);
+				char tmp;
+				while((tmp = fgetc(state.source)) != EOF) 
+					std::cout << tmp;
+			} // the iteration is not alive or is poisoned
+			std::cout << std::endl << "@=====@ end @=====@" << std::endl;
+			close_file(&state); // close the underlaying file, if it is opened.
+			if(!check_state(&state))  // iteration is poisoned and is alive
+				std::cout << "Invalid File: " << get_filename(&state) << std::endl << std::endl;
 		}
 		/*
 		Prints the name of actual file.
@@ -133,7 +118,7 @@ namespace LineReader {
 		*/
 		void printFilename(const LineReader* state) {
 			std::cout << "========" << std::flush;
-			std::cout << state->filenames[state->fileid] << std::flush; 
+			std::cout << get_filename(state) << std::flush; 
 			std::cout << "========" << std::endl;
 		}
 	}
@@ -326,11 +311,12 @@ namespace OrdenedLinkedMap {
 	}
 }
 int main() {
-	const char* filenames[3];
+	const char* filenames[4];
 	filenames[0] = "test1.txt";
 	filenames[1] = "test2.txt";
-	filenames[3] = "test3.txt";
-	LineReader::test::test(filenames, 2);
+	filenames[2] = "test3.txt";
+	filenames[3] = "test4.txt";
+	LineReader::test::test(filenames, 3);
 	OrdenedLinkedMap::test::test_insertion();
 	return 0;
 }
