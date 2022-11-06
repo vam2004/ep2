@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string>
 // encapuslate lineReader into a namespace
-namespace LineReader {
+namespace LineReaderFile {
 	struct LineReader {
 		const char** filenames; // the names of files to be readed
 		FILE* source;  // the state of actual file begin readed
@@ -94,6 +94,9 @@ namespace LineReader {
 		state->source = NULL; // init as NULL (warning (1) from close_file())
 		state->alive = open_file(state); // update "alive" field, which indicate if iteration is alive
 	}
+	void read_word(LineReader* state, std::string& buffer) {
+		
+	}
 	// use a namespace to encapsulate the testing suit
 	namespace test {
 		void printFilename(const LineReader* state);
@@ -106,7 +109,7 @@ namespace LineReader {
 				while((tmp = fgetc(state.source)) != EOF) 
 					std::cout << tmp;
 			} // the iteration is not alive or is poisoned
-			std::cout << std::endl << "@=====@ end @=====@" << std::endl;
+			std::cout << std::endl << "@=========@ end @=========@" << std::endl;
 			close_file(&state); // close the underlaying file, if it is opened.
 			if(!check_state(&state))  // iteration is poisoned and is alive
 				std::cout << "Invalid File: " << get_filename(&state) << std::endl << std::endl;
@@ -207,12 +210,17 @@ namespace OrdenedLinkedMap {
 			insert_right(list, element, last);
 		}
 	}
-	SearchInterval partial_find(OrdenedLinkedMap* list, void* key) {
+	void clear_search_interval(SearchInterval* into) {
+		into->lt = nullptr;
+		into->eq = nullptr;
+		into->gt = nullptr;
+	}
+	void partial_find(SearchInterval* state, OrdenedLinkedMap* list, void* key) {
 		/*
 		The target is the node the first node that key field is equal to "key"
 		A candidate is a node that could be the target. Exists up to one candidate, because the fields's value of all nodes after the first candidate are greater than key, and, therefore, all subsequent nodes aren't candidates.
 		*/
-		SearchInterval state = {nullptr, nullptr, nullptr};
+		clear_search_interval(state);
 		cmp_fn compare = list->compare; // store the function to compare in the stack
 		Node* pre = nullptr; // the last node that was lesser than key (null-initialization)
 		Node* now = list->first; // A candidate, if exists. Otherwise, it is nullptr (including the case of the list begin empty, that is, when list->first is nullptr). 
@@ -231,18 +239,16 @@ namespace OrdenedLinkedMap {
 		If exists at least one element in the list, then "prev" will pointer to last element that is lesser than key. But, if the list is empty, then "prev" remains as nullptr
 		*/
 		if(pre == nullptr) { // The list is empty
-			return state; // {lt: nullptr, eq: nullptr, gt: nullptr}
+			return; // {lt: nullptr, eq: nullptr, gt: nullptr}
 		} 
-		state.lt = pre; // The list is not empty
-		if (now == nullptr) { // Reached the end
-			return state; // {lt: prev, eq: nullptr, gt: nullptr}
-		}
+		state->lt = pre; // The list is not empty
+		if (now == nullptr) // Reached the end
+			return; // {lt: prev, eq: nullptr, gt: nullptr}
 		if(cmp == 1) { // The target was found
-			state.eq = now; // {lt: prev, eq: gt, gt: nullptr}
+			state->eq = now; // {lt: prev, eq: gt, gt: nullptr}
 		} else { // The target wasn't found
-			state.gt = now; // {lt: prev, eq: nullptr, gt: now}
+			state->gt = now; // {lt: prev, eq: nullptr, gt: now}
 		}
-		return state;
 	}
 	/*
 	return a boolean value representing if the ordened linked map was empty when the partial_find() was done. This could depends of how partial_find() was implemented, therefore should be always used for this situation.
@@ -256,18 +262,31 @@ namespace OrdenedLinkedMap {
 	Node* find_or_create(OrdenedLinkedMap* list, void* key) {
 		return nullptr;
 	}
+	// the cmp_fn implementation for type "int"
+	int compare_int(void* left, void* right) {
+		int ileft = *((int*) left);
+		int iright = *((int*) left);
+		if(ileft < iright)
+			return -1;
+		if(ileft == iright)
+			return 0;
+		return 1;
+	}
+	// the cmp_fn implementation for type "std::string"
+	int compare_string(void* left, void* right) {
+		std::string sleft = *((std::string*) left);
+		std::string sright = *((std::string*) left);
+		return sleft.compare(sright);
+	}
+	Node* create_node(void* key, void* value) {
+		Node* tmp = new Node;
+		tmp->next = nullptr;
+		tmp->prev = nullptr;
+		return tmp;
+	}
 	namespace test {
 		void printmap_left_int(OrdenedLinkedMap* list);
 		void printmap_right_int(OrdenedLinkedMap* list);
-		int compare_int(void* left, void* right) {
-			int ileft = *((int*) left);
-			int iright = *((int*) left);
-			if(ileft < iright)
-				return -1;
-			if(ileft == iright)
-				return 0;
-			return 1;
-		}
 		void test_insertion() {
 			int left_keys[] = {10, 15, 16, 97, -113, 48};
 			int left_values[] = {20, 82, -72, 37, 51, 45};
@@ -275,19 +294,11 @@ namespace OrdenedLinkedMap {
 			int right_values[] = {0, 79, 53, 111, -7, 83};
 			OrdenedLinkedMap list = {nullptr, nullptr, 0, compare_int};
 			for(size_t i = 0; i < 6; i++) {
-				Node* data = new Node;
-				data->key = (void*) (left_keys + i);
-				data->value = (void*) (left_values + i);
-				data->next = nullptr;
-				data->prev = nullptr;
+				Node* data = create_node(left_keys + i, left_values + i);
 				insert_first(&list, data);
 			}
 			for(size_t i = 0; i < 6; i++) {
-				Node* data = new Node;
-				data->key = (void*) (right_keys + i);
-				data->value = (void*) (right_values + i);
-				data->next = nullptr;
-				data->prev = nullptr;
+				Node* data = create_node(right_keys + i, right_values + i);
 				insert_last(&list, data);
 			}
 			printmap_left_int(&list);
@@ -316,7 +327,7 @@ int main() {
 	filenames[1] = "test2.txt";
 	filenames[2] = "test3.txt";
 	filenames[3] = "test4.txt";
-	LineReader::test::test(filenames, 3);
+	LineReaderFile::test::test(filenames, 3);
 	OrdenedLinkedMap::test::test_insertion();
 	return 0;
 }
