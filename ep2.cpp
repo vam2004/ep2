@@ -1,6 +1,7 @@
 #include <iostream>
 #include <locale>
 #include <stdio.h>
+#include <assert.h>
 #include <string>
 // encapuslate lineReader into a namespace
 namespace LineReaderFile {
@@ -141,16 +142,15 @@ namespace OrdenedLinkedMap {
 	struct Node {
 		void* key; // the value used for referencing 
 		void* value; // the value begin referencied
-		Node* prev; // previuos node in the ordened linked map
-		Node* next; // next node in the ordened linked map
+		Node* prev; // previuos (left) node in the ordened linked map
+		Node* next; // next (right) node in the ordened linked map
 	};
 	/*
 	The entry point of linked ordened map
 	*/
 	struct OrdenedLinkedMap {
-		Node* first; // the first node in the ordened map
-		Node* last; // the last node in the ordened map
-		size_t size;
+		Node* first; // the first node (left egde) of the ordened linked map
+		Node* last; // the last node (right edge) of the ordened linked map
 		cmp_fn compare; // trampoline: the function used for comparing
 	};
 	/*
@@ -162,53 +162,129 @@ namespace OrdenedLinkedMap {
 		Node* gt; // the node that is great than the target (nullptr if not exists)
 	};
 	/*
-	Insert a element in the left side of another.
-	[warnings]:
-		(1) Position shall not be null
+	Insert a element at the left side of another. If the "position" is the left edge of linked ordened map then inserts and update that.
+	[Warnings]:
+		(1) The left edge of linked ordened map shall have its pointer to left node as nullptr.
+		(2) The "position" shall not be nullptr. 
+		(3) The "element" shall not be nullptr.
+		(4) The fields pointer to left and right nodes of "element" should be nullptr. Because these pointers could be overwriten (pontential memory leak).
+		(5) The function doesn't validate ordering
 	*/
-	void insert_left(OrdenedLinkedMap* list, Node* element, Node* position) {
-		Node* previuos = position->prev; // previuos node of "position"
-		element->next = position; // previous <-> element <-> position
-		element->prev = previuos;
-		if(previuos != nullptr) {
+	void insertLeft(OrdenedLinkedMap* list, Node* element, Node* position) {
+		Node* previuos = position->prev; // copy the reference to left node of "position"
+		element->next = position; // (1) link "position" as the right node of "element"
+		element->prev = previuos; // (2) link "previuos" as the left node of "element"
+		position->prev = element; // (3) link "element" as the left node of "element"
+		if(previuos != nullptr) { // the "position" is not the left edge of linked ordened map
 			previuos->next = element;
-		} else {
+			/* Crescent links:
+			* 	"previuos" points to "element" as right node
+			* 	"element" points to "position" as right node [because of (1)]
+			* Decrescent links:
+			*	"position" points to "element" as left node [because of (3)]
+			*	"element" points to "previuos" as left node [because of (2)]
+			* Diagram: 
+			* 	previuos <-> element <-> position
+			*/
+		} else { // the "position" is the left edge of linked ordened map
 			list->first = element;
+			/* Crescent links:
+			* 	"element" is the left edge node of ordened linked map
+			* 	"element" points to "position" as right node [because of (1)]
+			* Decrescent links:
+			*	"position" points to "element" as left node [because of (3)]
+			*	"element" is the left edge node of ordened linked map
+			* Diagram: 
+			* 	(left edge) -> element <-> position
+			*/
 		}	
-		position->prev = element;
 	}
 	/*
-	Insert a element in the right side of another. 
-	[warnings]:
-		(1) Position shall not be null
+	Insert a element at the right side of another.  If the "position" is the right edge of map then inserts and update that.
+	[Warnings]:
+		(1) The right edge of linked ordened map shall have its pointer to right node as nullptr.
+		(2) The "position" shall not be nullptr. 
+		(3) The "element" shall not be nullptr.
+		(4) The fields pointer to left and right nodes of "element" should be nullptr. Because these pointers will be overwriten (pontential memory leak).
+		(5) The function doesn't validate ordering
 	*/
-	void insert_right(OrdenedLinkedMap* list, Node* element, Node* position) {
-		Node* next = position->next; // next node of "position"
-		element->next = next; // position <-> element <-> next
-		element->prev = position;
-		if(next != nullptr) {
-			next->next = element;
+	void insertRight(OrdenedLinkedMap* list, Node* element, Node* position) {
+		Node* next = position->next; // copy the reference to left node of "position"
+		element->next = next; // (1) link "next" as the right node of "element"
+		element->prev = position; // (2) link "position" as the left node of "element"
+		position->next = element; // (3) link "element" as the right node of "position"
+		if(next != nullptr) {// the "position" is not the right edge of linked ordened map
+			next->prev = element;
+			/* Crescent links:
+			*	"position" points to "element" as right node [because of (3)]
+			* 	"element" points to "next" as right node [because of (1)]
+			* Decrescent links:
+			*	"next" points to "element" as left node 
+			*	"element" points to "previuos" as left node [because of (2)]
+			* Diagram: 
+			* 	position <-> element <-> next
+			*/
 		} else {
 			list->last = element;
+			/* Crescent links:
+			*	"position" points to "element" as right node [because of (3)]
+			* 	"element" is the right edge node of ordened linked map
+			* Decrescent links:
+			*	"element" is the right edge node of ordened linked map
+			*	"element" points to "previuos" as left node [because of (2)]
+			* Diagram: 
+			* 	position <-> element <- (right edge)
+			*/
 		}
-		position->next = element;
+		
 	}
-	void insert_first(OrdenedLinkedMap* list, Node* element) {
+	/*
+	Inserts a node at begining of linked map. That is, inserts and update the first 
+	[Warnings]:
+		(1) If the linked ordened map is empty, then the left edge shall be nullptr
+		(2) Inherits warnings (1), (3), (4) and (5) from insertLeft()
+	*/
+	void appendLeft(OrdenedLinkedMap* list, Node* element) {
 		Node* first = list->first;
-		if(first == nullptr) {
-			list->first = element;
-			list->last = element;
-		} else {
-			insert_left(list, element, first);
+		if(first == nullptr) { // the linked ordened map is empty
+			list->first = element; // if the linked ordened map is not empty, the left edge shalln't be nullptr
+			list->last = element; // if the linked ordened map is not empty, the right edge shalln't be nullptr
+		} else { // the linked ordened map is not empty
+			assert(first->prev == nullptr); // as said in the warning (1)
+			insert_left(list, element, first); // insert at left side of left edge 
 		}
 	}
-	void insert_last(OrdenedLinkedMap* list, Node* element) {
+	/*
+	Inserts a node at begining of linked map. That is, inserts and update the first 
+	[Warnings]:
+		(1) If the linked ordened map is empty, then the right edge shall be nullptr
+		(2) Inherits warnings (1), (3), (4) and (5) from insertRight()
+	*/
+	void appendRight(OrdenedLinkedMap* list, Node* element) {
 		Node* last = list->last;
 		if(last == nullptr) {
-			list->last = element;
-			list->first = element;
+			list->first = element; // if the linked ordened map is not empty, the left edge shalln't be nullptr
+			list->last = element; // if the linked ordened map is not empty, the right edge shalln't be nullptr
 		} else {
-			insert_right(list, element, last);
+			assert(last->next == nullptr); // as said in the warning (1)
+			insert_right(list, element, last); // insert at right side of right edge
+		}
+	}
+	/* insert a node between two nodes. If exactly one of these two nodes is nullptr, then insert into corresponding edge of the map.
+	[Warnings]:
+		(1) The "left" node shall be at left side of "right" node. 
+		(2) The "right" node shall be at right side of "right" node. 
+		(3) Inherits warnings (1) and (2) from appendLeft()
+		(3) Inherits warnings (1) and (2) from appendRight()
+		(4) Both "left" and "right"
+	*/
+	void insert_beetween(OrdenedLinkedMap* list, Node* element, Node* left, Node* right) {
+		assert(left != nullptr && left->next == left); // as said in warning (1)
+		assert(right != nullptr && right->prev == left); // as said in warning (2)
+		if(left == nullptr) { // right is the left edge of ordened linked map
+			appendLeft(list, element); // insert at begining
+		} else { // right is not the left edge of ordened linked map
+			insertRight(list, element, left); // insert at right side of "left" (and therefore at left side of "right")
 		}
 	}
 	void clear_search_interval(SearchInterval* into) {
@@ -305,11 +381,11 @@ namespace OrdenedLinkedMap {
 			OrdenedLinkedMap list = {nullptr, nullptr, 0, compare_int};
 			for(size_t i = 0; i < 6; i++) {
 				Node* data = create_node(left_keys + i, left_values + i);
-				insert_first(&list, data);
+				appendLeft(&list, data);
 			}
 			for(size_t i = 0; i < 6; i++) {
 				Node* data = create_node(right_keys + i, right_values + i);
-				insert_last(&list, data);
+				appendRight(&list, data);
 			}
 			printmap_left_int(&list);
 			std::wcout << std::endl;
@@ -341,6 +417,56 @@ namespace OrdenedLinkedMap {
 		void printnode(Node* src){
 			std::wcout << "key=" << *((int*) src->key) << " ";
 			std::wcout << "value=" << *((int*) src->value) << std::endl;
+		}
+		bool check_ifin_pool(Node* element, Node** nodes, size_t amount) {
+			size_t pos = 0;
+			while(i < amount && element != nodes[pos]) 
+				pos++;
+			return element == nodes[pos];
+		}
+		// itinerates and checks if the left links points to a node inside the pool. Returns nullptr, if sucessful. Otherwise, returns a pointer that's poisioned.
+		void* soft_check_leftlink(OrdenedLinkedMap* list, Node** nodes, size_t amount) {
+			for(Node* now = list->first; now != nullptr; now = now->next) {
+				if(!check_ifin_pool(now, nodes, amount))
+					return now;
+			}
+			return nullptr;
+		}
+		// itinerates and checks if the right links points to a node inside the pool. Returns nullptr, if sucessful. Otherwise, returns a pointer that's poisioned.
+		bool soft_check_rightlink(OrdenedLinkedMap* list, Node** nodes, size_t amount) {
+			for(Node* now = list->last; now != nullptr; now = now->prev) {
+				if(!check_ifin_pool(now, nodes, amount))
+					return now;
+			}
+			return nullptr;
+		}
+		/* Check if both edge are valid:
+		- The left edge shall points to nullptr as left node
+		- The right edge shall points to nullptr as right node
+		- The left edge points to nullptr as right node if, and only if, the right edge points to nullptr 
+		*/
+		bool check_edges(OrdenedLinkedMap* list) {
+			
+		}
+		/* checks node correctly cross reference its counterpart:
+			- if B is the right node of A and B is not null, then A shall be the left node of B.
+			- if A is the left node of B and A is not null, then B shall be the right node of A
+		*/
+		bool check_crosslink_of(Node* element) {
+			Node* prev = element->prev;
+			Node* next = element->next;
+			if(next != nullptr && next->prev != element)
+				return false;
+			if(prev != nullptr && prev->next != element)
+				return false;
+			return true;
+		}
+		Node* check_crosslink(OrdenedLinkedMap* list) {
+			for(Node* now = list->first; now != nullptr; now = now->next) {
+				if(!check_crosslink_of(now))
+					return now;
+			}
+			return nullptr;
 		}
 		void printmap_left_int(OrdenedLinkedMap* list) {
 			for(Node* now = list->first; now != nullptr; now = now->next) {
