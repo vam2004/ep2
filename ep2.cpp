@@ -1,5 +1,6 @@
 #include <iostream>
 #include <locale>
+#include <clocale>
 #include <stdio.h>
 #include <assert.h>
 #include <string>
@@ -107,8 +108,8 @@ namespace LineReaderFile {
 			std::string line; // the buffer
 			for(create(&state, names, amount); isgood(&state); next_file(&state)) {
 				printFilename(&state);
-				char tmp;
-				while((tmp = fgetc(state.source)) != EOF) 
+				wchar_t tmp;
+				while((tmp = getwc(state.source)) != WEOF) 
 					std::wcout << tmp;
 			} // the iteration is not alive or is poisoned
 			std::wcout << std::endl << "@=========@ end @=========@" << std::endl;
@@ -122,9 +123,9 @@ namespace LineReaderFile {
 			(1) The "state" shall be alive (the iteration wasn't ended)
 		*/
 		void printFilename(const LineReader* state) {
-			std::wcout << "========" << std::flush;
+			std::wcout << L"========" << std::flush;
 			std::wcout << get_filename(state) << std::flush; 
-			std::wcout << "========" << std::endl;
+			std::wcout << L"========" << std::endl;
 		}
 	}
 }
@@ -251,7 +252,7 @@ namespace OrdenedLinkedMap {
 			list->last = element; // if the linked ordened map is not empty, the right edge shalln't be nullptr
 		} else { // the linked ordened map is not empty
 			assert(first->prev == nullptr); // as said in the warning (1)
-			insert_left(list, element, first); // insert at left side of left edge 
+			insertLeft(list, element, first); // insert at left side of left edge 
 		}
 	}
 	/*
@@ -267,7 +268,7 @@ namespace OrdenedLinkedMap {
 			list->last = element; // if the linked ordened map is not empty, the right edge shalln't be nullptr
 		} else {
 			assert(last->next == nullptr); // as said in the warning (1)
-			insert_right(list, element, last); // insert at right side of right edge
+			insertRight(list, element, last); // insert at right side of right edge
 		}
 	}
 	/* insert a node between two nodes. If exactly one of these two nodes is nullptr, then insert into corresponding edge of the map.
@@ -370,26 +371,52 @@ namespace OrdenedLinkedMap {
 		return tmp;
 	}
 	namespace test {
-		void printmap_left_int(OrdenedLinkedMap* list);
-		void printmap_right_int(OrdenedLinkedMap* list);
-		void show_comparation_wstring(std::wstring* left, std::wstring* right);
-		void test_insertion() {
+		// prototypes
+		void test_edge_insertion(bool debug);
+		void test_string_comparation();
+		const char* get_cmp_symbol(int result);
+		void show_comparation_wstring(const std::wstring* left, const std::wstring* right);
+		void printnode(const Node* src);
+		bool check_ifin_pool(const Node* element, const Node** nodes, size_t amount);
+		Node* check_leftlink(const OrdenedLinkedMap* list, const Node** nodes, size_t amount);
+		Node* check_rightlink(const OrdenedLinkedMap* list, const Node** nodes, size_t amount);
+		bool check_edges(const OrdenedLinkedMap* list);
+		bool check_crosslink_of(const Node* element);
+		Node* check_crosslink(const OrdenedLinkedMap* list);
+		void printmap_left_int(const OrdenedLinkedMap* list);
+		void printmap_right_int(const OrdenedLinkedMap* list);
+		
+		void test_edge_insertion(bool debug) {
+			const size_t left_nodes = 6;
+			const size_t right_nodes = 6;
+			const size_t nodes_amount = left_nodes + right_nodes;
 			int left_keys[] = {10, 15, 16, 97, -113, 48};
 			int left_values[] = {20, 82, -72, 37, 51, 45};
 			int right_keys[] = {0, 80, 59, 68, 31, 56};
 			int right_values[] = {0, 79, 53, 111, -7, 83};
-			OrdenedLinkedMap list = {nullptr, nullptr, 0, compare_int};
-			for(size_t i = 0; i < 6; i++) {
+			const Node* nodes[12];
+			OrdenedLinkedMap list = {nullptr, nullptr, compare_int};
+			assert(check_edges(&list));
+			for(size_t i = 0; i < left_nodes; i++) {
 				Node* data = create_node(left_keys + i, left_values + i);
+				nodes[(left_nodes - 1) - i] = data;
 				appendLeft(&list, data);
+				assert(check_edges(&list));
 			}
-			for(size_t i = 0; i < 6; i++) {
+			for(size_t i = 0; i < right_nodes; i++) {
 				Node* data = create_node(right_keys + i, right_values + i);
+				nodes[left_nodes + i] = data;
 				appendRight(&list, data);
+				assert(check_edges(&list));
 			}
-			printmap_left_int(&list);
-			std::wcout << std::endl;
-			printmap_right_int(&list);
+			if(debug) {
+				printmap_left_int(&list);
+				std::wcout << std::endl;
+				printmap_right_int(&list);
+			}
+			assert(check_crosslink(&list) == nullptr);
+			assert(check_leftlink(&list, nodes, nodes_amount) == nullptr);
+			assert(check_rightlink(&list, nodes, nodes_amount) == nullptr);
 		}
 		void test_string_comparation(){
 			const wchar_t* src[] = {L"é", L"és", L"bem", L"bom", L"já", L"com", L"de", L"e", L"e"};
@@ -409,23 +436,24 @@ namespace OrdenedLinkedMap {
 				return "=";
 			return ">";
 		}
-		void show_comparation_wstring(std::wstring* left, std::wstring* right){
+		void show_comparation_wstring(const std::wstring* left, const std::wstring* right){
 			std::wcout << *left << L" ";
 			std::wcout << get_cmp_symbol(compare_wstring(left, right));
 			std::wcout << L" " << *right << std::endl;
 		}
-		void printnode(Node* src){
+		void printnode(const Node* src){
 			std::wcout << "key=" << *((int*) src->key) << " ";
+			//std::wcout << "adress=" << src << " ";
 			std::wcout << "value=" << *((int*) src->value) << std::endl;
 		}
-		bool check_ifin_pool(Node* element, Node** nodes, size_t amount) {
+		bool check_ifin_pool(const Node* element, const Node** nodes, size_t amount) {
 			size_t pos = 0;
-			while(i < amount && element != nodes[pos]) 
+			while(pos < amount && element != nodes[pos]) 
 				pos++;
 			return element == nodes[pos];
 		}
 		// itinerates and checks if the left links points to a node inside the pool. Returns nullptr, if sucessful. Otherwise, returns a pointer that's poisioned.
-		void* soft_check_leftlink(OrdenedLinkedMap* list, Node** nodes, size_t amount) {
+		Node* check_rightlink(const OrdenedLinkedMap* list, const Node** nodes, size_t amount) {
 			for(Node* now = list->first; now != nullptr; now = now->next) {
 				if(!check_ifin_pool(now, nodes, amount))
 					return now;
@@ -433,7 +461,7 @@ namespace OrdenedLinkedMap {
 			return nullptr;
 		}
 		// itinerates and checks if the right links points to a node inside the pool. Returns nullptr, if sucessful. Otherwise, returns a pointer that's poisioned.
-		bool soft_check_rightlink(OrdenedLinkedMap* list, Node** nodes, size_t amount) {
+		Node* check_leftlink(const OrdenedLinkedMap* list, const Node** nodes, size_t amount) {
 			for(Node* now = list->last; now != nullptr; now = now->prev) {
 				if(!check_ifin_pool(now, nodes, amount))
 					return now;
@@ -445,14 +473,22 @@ namespace OrdenedLinkedMap {
 		- The right edge shall points to nullptr as right node
 		- The left edge points to nullptr as right node if, and only if, the right edge points to nullptr 
 		*/
-		bool check_edges(OrdenedLinkedMap* list) {
-			
+		bool check_edges(const OrdenedLinkedMap* list) {
+			if(list->first == nullptr) 
+				return list->last == nullptr; 
+			if(list->last == nullptr)
+				return false;
+			if(list->first->prev != nullptr)
+				return false;
+			if(list->last->next != nullptr)
+				return false;
+			return true;
 		}
 		/* checks node correctly cross reference its counterpart:
 			- if B is the right node of A and B is not null, then A shall be the left node of B.
 			- if A is the left node of B and A is not null, then B shall be the right node of A
 		*/
-		bool check_crosslink_of(Node* element) {
+		bool check_crosslink_of(const Node* element) {
 			Node* prev = element->prev;
 			Node* next = element->next;
 			if(next != nullptr && next->prev != element)
@@ -461,19 +497,19 @@ namespace OrdenedLinkedMap {
 				return false;
 			return true;
 		}
-		Node* check_crosslink(OrdenedLinkedMap* list) {
+		Node* check_crosslink(const OrdenedLinkedMap* list) {
 			for(Node* now = list->first; now != nullptr; now = now->next) {
 				if(!check_crosslink_of(now))
 					return now;
 			}
 			return nullptr;
 		}
-		void printmap_left_int(OrdenedLinkedMap* list) {
+		void printmap_left_int(const OrdenedLinkedMap* list) {
 			for(Node* now = list->first; now != nullptr; now = now->next) {
 				printnode(now);
 			}
 		}
-		void printmap_right_int(OrdenedLinkedMap* list) {
+		void printmap_right_int(const OrdenedLinkedMap* list) {
 			for(Node* now = list->last; now != nullptr; now = now->prev) {
 				printnode(now);
 			}
@@ -482,13 +518,15 @@ namespace OrdenedLinkedMap {
 }
 int main() {
 	const char* filenames[4];
-	std::locale::global (std::locale (""));
+	//std::locale::global (std::locale (""));
+	setlocale(LC_ALL, "");
+	std::wcout << L"";
 	filenames[0] = "test1.txt";
 	filenames[1] = "test2.txt";
 	filenames[2] = "test3.txt";
 	filenames[3] = "test4.txt";
 	LineReaderFile::test::test(filenames, 3);
 	OrdenedLinkedMap::test::test_string_comparation();
-	OrdenedLinkedMap::test::test_insertion();
+	OrdenedLinkedMap::test::test_edge_insertion(true);
 	return 0;
 }
