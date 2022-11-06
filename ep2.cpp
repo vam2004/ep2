@@ -1,4 +1,5 @@
 #include <iostream>
+#include <locale>
 #include <stdio.h>
 #include <string>
 // encapuslate lineReader into a namespace
@@ -107,12 +108,12 @@ namespace LineReaderFile {
 				printFilename(&state);
 				char tmp;
 				while((tmp = fgetc(state.source)) != EOF) 
-					std::cout << tmp;
+					std::wcout << tmp;
 			} // the iteration is not alive or is poisoned
-			std::cout << std::endl << "@=========@ end @=========@" << std::endl;
+			std::wcout << std::endl << "@=========@ end @=========@" << std::endl;
 			close_file(&state); // close the underlaying file, if it is opened.
 			if(!check_state(&state))  // iteration is poisoned and is alive
-				std::cout << "Invalid File: " << get_filename(&state) << std::endl << std::endl;
+				std::wcout << "Invalid File: " << get_filename(&state) << std::endl << std::endl;
 		}
 		/*
 		Prints the name of actual file.
@@ -120,9 +121,9 @@ namespace LineReaderFile {
 			(1) The "state" shall be alive (the iteration wasn't ended)
 		*/
 		void printFilename(const LineReader* state) {
-			std::cout << "========" << std::flush;
-			std::cout << get_filename(state) << std::flush; 
-			std::cout << "========" << std::endl;
+			std::wcout << "========" << std::flush;
+			std::wcout << get_filename(state) << std::flush; 
+			std::wcout << "========" << std::endl;
 		}
 	}
 }
@@ -275,13 +276,13 @@ namespace OrdenedLinkedMap {
 	// the cmp_fn implementation for type "std::string"
 	int compare_string(const void* left, const void* right) {
 		std::string sleft = *((std::string*) left);
-		std::string sright = *((std::string*) left);
+		std::string sright = *((std::string*) right);
 		return sleft.compare(sright);
 	}
 	// the cmp_fn implementation for type "std::wstring"
 	int compare_wstring(const void* left, const void* right) {
 		std::wstring sleft = *((std::wstring*) left);
-		std::wstring sright = *((std::wstring*) left);
+		std::wstring sright = *((std::wstring*) right);
 		return sleft.compare(sright);
 	}
 	Node* create_node(void* key, void* value) {
@@ -295,6 +296,7 @@ namespace OrdenedLinkedMap {
 	namespace test {
 		void printmap_left_int(OrdenedLinkedMap* list);
 		void printmap_right_int(OrdenedLinkedMap* list);
+		void show_comparation_wstring(std::wstring* left, std::wstring* right);
 		void test_insertion() {
 			int left_keys[] = {10, 15, 16, 97, -113, 48};
 			int left_values[] = {20, 82, -72, 37, 51, 45};
@@ -310,7 +312,7 @@ namespace OrdenedLinkedMap {
 				insert_last(&list, data);
 			}
 			printmap_left_int(&list);
-			std::cout << std::endl;
+			std::wcout << std::endl;
 			printmap_right_int(&list);
 		}
 		void test_string_comparation(){
@@ -318,22 +320,27 @@ namespace OrdenedLinkedMap {
 			std::wstring* text[9];
 			for(size_t i = 0; i < 9; i++)
 				text[i] = new std::wstring(src[i]);
-			std::cout << std::flush;
+			std::wcout << std::flush;
 			for(size_t i = 0; i < 8; i++) {
-				//int cmp = compare_string(text[i], text[i+1]);
-				std::wcout << *text[i] << L" ";
-				/*if (cmp == -1)
-					std::wcout << L"<";
-				else if (cmp == 0)
-					std::wcout << L"=";
-				else
-					std::wcout << L">";*/
-				//std::wcout << L" " << text[i+1] << std::endl;
+				show_comparation_wstring(text[i], text[i+1]);
 			}
+			std::wcout << std::endl;
+		}
+		const char* get_cmp_symbol(int result) {
+			if (result == -1)
+				return "<";
+			if (result == 0)
+				return "=";
+			return ">";
+		}
+		void show_comparation_wstring(std::wstring* left, std::wstring* right){
+			std::wcout << *left << L" ";
+			std::wcout << get_cmp_symbol(compare_wstring(left, right));
+			std::wcout << L" " << *right << std::endl;
 		}
 		void printnode(Node* src){
-			std::cout << "key=" << *((int*) src->key) << " ";
-			std::cout << "value=" << *((int*) src->value) << std::endl;
+			std::wcout << "key=" << *((int*) src->key) << " ";
+			std::wcout << "value=" << *((int*) src->value) << std::endl;
 		}
 		void printmap_left_int(OrdenedLinkedMap* list) {
 			for(Node* now = list->first; now != nullptr; now = now->next) {
@@ -349,14 +356,13 @@ namespace OrdenedLinkedMap {
 }
 int main() {
 	const char* filenames[4];
+	std::locale::global (std::locale (""));
 	filenames[0] = "test1.txt";
 	filenames[1] = "test2.txt";
 	filenames[2] = "test3.txt";
 	filenames[3] = "test4.txt";
-	std::wcout << "¿és mi hermano?" << std::endl;
-	//LineReaderFile::test::test(filenames, 3);
-	//OrdenedLinkedMap::test::test_string_comparation();
-	//OrdenedLinkedMap::test::test_insertion();
-	
+	LineReaderFile::test::test(filenames, 3);
+	OrdenedLinkedMap::test::test_string_comparation();
+	OrdenedLinkedMap::test::test_insertion();
 	return 0;
 }
