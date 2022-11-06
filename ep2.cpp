@@ -133,7 +133,7 @@ namespace OrdenedLinkedMap {
 		0, if the left element is equal to right element
 		1, if the left element is greater than right
 	*/
-	using cmp_fn = int (*)(void*, void*);
+	using cmp_fn = int (*)(const void*, const void*);
 	/*
 	The node in the linked ordened map
 	*/
@@ -263,7 +263,7 @@ namespace OrdenedLinkedMap {
 		return nullptr;
 	}
 	// the cmp_fn implementation for type "int"
-	int compare_int(void* left, void* right) {
+	int compare_int(const void* left, const void* right) {
 		int ileft = *((int*) left);
 		int iright = *((int*) left);
 		if(ileft < iright)
@@ -273,9 +273,15 @@ namespace OrdenedLinkedMap {
 		return 1;
 	}
 	// the cmp_fn implementation for type "std::string"
-	int compare_string(void* left, void* right) {
+	int compare_string(const void* left, const void* right) {
 		std::string sleft = *((std::string*) left);
 		std::string sright = *((std::string*) left);
+		return sleft.compare(sright);
+	}
+	// the cmp_fn implementation for type "std::wstring"
+	int compare_wstring(const void* left, const void* right) {
+		std::wstring sleft = *((std::wstring*) left);
+		std::wstring sright = *((std::wstring*) left);
 		return sleft.compare(sright);
 	}
 	Node* create_node(void* key, void* value) {
@@ -307,6 +313,24 @@ namespace OrdenedLinkedMap {
 			std::cout << std::endl;
 			printmap_right_int(&list);
 		}
+		void test_string_comparation(){
+			const wchar_t* src[] = {L"é", L"és", L"bem", L"bom", L"já", L"com", L"de", L"e", L"e"};
+			std::wstring* text[9];
+			for(size_t i = 0; i < 9; i++)
+				text[i] = new std::wstring(src[i]);
+			std::cout << std::flush;
+			for(size_t i = 0; i < 8; i++) {
+				//int cmp = compare_string(text[i], text[i+1]);
+				std::wcout << *text[i] << L" ";
+				/*if (cmp == -1)
+					std::wcout << L"<";
+				else if (cmp == 0)
+					std::wcout << L"=";
+				else
+					std::wcout << L">";*/
+				//std::wcout << L" " << text[i+1] << std::endl;
+			}
+		}
 		void printnode(Node* src){
 			std::cout << "key=" << *((int*) src->key) << " ";
 			std::cout << "value=" << *((int*) src->value) << std::endl;
@@ -329,7 +353,10 @@ int main() {
 	filenames[1] = "test2.txt";
 	filenames[2] = "test3.txt";
 	filenames[3] = "test4.txt";
-	LineReaderFile::test::test(filenames, 3);
-	OrdenedLinkedMap::test::test_insertion();
+	std::wcout << "¿és mi hermano?" << std::endl;
+	//LineReaderFile::test::test(filenames, 3);
+	//OrdenedLinkedMap::test::test_string_comparation();
+	//OrdenedLinkedMap::test::test_insertion();
+	
 	return 0;
 }
