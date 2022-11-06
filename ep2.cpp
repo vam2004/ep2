@@ -280,6 +280,8 @@ namespace OrdenedLinkedMap {
 	}
 	Node* create_node(void* key, void* value) {
 		Node* tmp = new Node;
+		tmp->key = key;
+		tmp->value = value;
 		tmp->next = nullptr;
 		tmp->prev = nullptr;
 		return tmp;
