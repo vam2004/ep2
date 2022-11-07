@@ -4,7 +4,10 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string>
+#include <climits>
 // encapuslate lineReader into a namespace
+using usize = unsigned int;
+#define USIZE_MAX UINT_MAX
 namespace LineReaderFile {
 	struct LineReader {
 		const char** filenames; // the names of files to be readed
@@ -137,6 +140,7 @@ namespace OrdenedLinkedMap {
 		1, if the left element is greater than right
 	*/
 	using cmp_fn = int (*)(const void*, const void*);
+	#define UNKNOWN_INDEX 0
 	/*
 	The node in the linked ordened map
 	*/
@@ -145,6 +149,7 @@ namespace OrdenedLinkedMap {
 		void* value; // the value begin referencied
 		Node* prev; // previuos (left) node in the ordened linked map
 		Node* next; // next (right) node in the ordened linked map
+		USIZE_MAX index; // used when normalizing the ordened linked map
 	};
 	/*
 	The entry point of linked ordened map
@@ -340,7 +345,7 @@ namespace OrdenedLinkedMap {
 	Node* find_or_create(OrdenedLinkedMap* list, void* key) {
 		return nullptr;
 	}
-	// the cmp_fn implementation for type "int"
+	// the cmp_fn implementation for type "int"*((int*) left);
 	int compare_int(const void* left, const void* right) {
 		int ileft = *((int*) left);
 		int iright = *((int*) left);
@@ -368,7 +373,51 @@ namespace OrdenedLinkedMap {
 		tmp->value = value;
 		tmp->next = nullptr;
 		tmp->prev = nullptr;
+		tmp->index = UNKNOWN_INDEX;
 		return tmp;
+	}
+	/* Check if both edge are valid:
+		- The left edge shall points to nullptr as left key=node
+		- The right edge shall points to nullptr as right node
+		- The left edge points to nullptr as right node if, and only if, the right edge points to nullptr 
+	*/
+	int check_edges(const OrdenedLinkedMap* list) {
+			if(list->first == nullptr) 
+				return (list->last == nullptr) ? 0 : 1; 
+			if(list->last == nullptr)
+				return 2;
+			if(list->first->prev != nullptr)
+				return 3;
+			if(list->last->next != nullptr)
+				return 4;
+			return 0;
+	}
+	// checks for circular reference from end to begining. If exist returns the first node of circular reference. Otherwise, returns nullptr
+	Node* check_circular_dec(const OrdenedLinkedMap* list) {
+		for(Node* now = list->last; now != nullptr && now->index != USIZE_MAX; now = now->prev)
+			now.index = USIZE_MAX;
+		return now
+	}
+	// shall be called after 
+	bool check_reachable_left(const OrdenedLinkedMap* list) {
+		Node* first = list->first;
+		if(first != nullptr)
+			return first->index == USIZE_MAX;
+		return true;
+	}
+	void update_indexes(const OrdenedLinkedMap* list) {
+		Node* now;
+		while(now != nullptr) {
+			counter = 0;
+			while(counter < USIZE_MAX && now != nullptr) {
+				now->index = counter++;
+				now = now->next;
+			}
+		}
+	}
+	void clear_indexes(const OrdenedLinkedMap* list) {
+		for(Node* now = list->first; now != nullptr && now->index != USIZE_MAX; now = now->prev)
+			now.index = USIZE_MAX;
 	}
 	namespace test {
 		// prototypes
@@ -443,7 +492,7 @@ namespace OrdenedLinkedMap {
 		}
 		void printnode(const Node* src){
 			std::wcout << "key=" << *((int*) src->key) << " ";
-			//std::wcout << "adress=" << src << " ";
+			std::wcout << "adress=" << src << " ";
 			std::wcout << "value=" << *((int*) src->value) << std::endl;
 		}
 		bool check_ifin_pool(const Node* element, const Node** nodes, size_t amount) {
@@ -469,7 +518,7 @@ namespace OrdenedLinkedMap {
 			return nullptr;
 		}
 		/* Check if both edge are valid:
-		- The left edge shall points to nullptr as left node
+		- The left edge shall points to nullptr as left key=node
 		- The right edge shall points to nullptr as right node
 		- The left edge points to nullptr as right node if, and only if, the right edge points to nullptr 
 		*/
