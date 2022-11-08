@@ -140,7 +140,6 @@ namespace OrdenedLinkedMap {
 	/*
 	The node in the linked ordened map
 	*/
-	#define LINKMARK
 	struct Node {
 		void* key; // the value used for referencing 
 		void* value; // the value begin referencied
@@ -163,22 +162,32 @@ namespace OrdenedLinkedMap {
 			Node* now;
 			bool reverse;
 		}
+		void create(NodeIterator* state, const OrdenedLinkedMap* list) {
+			state->reverse = false;
+			rewind(state, list);
+		}
+		void createReverse(NodeIterator* state, const OrdenedLinkedMap* list) {
+			state->reverse = true;
+			rewind(state, list);
+		}
 		bool isalive(const NodeIterator* state) {
 			return state->now != nullptr;
 		}
-		void rewind(NodeIterator* state, OrdenedLinkedMap* list) {
+		void rewind(NodeIterator* state, const OrdenedLinkedMap* list) {
 			state->now = state->reverse ? list->last : list->first;
 		}
-		void seekend(NodeIterator* state, OrdenedLinkedMap* list) {
+		void seekend(NodeIterator* state, const OrdenedLinkedMap* list) {
 			state->now = state->reverse ? list->first : list->last;
 		}
-		void next(NodeIterator* state) {
+		Node* next(NodeIterator* state) {
 			Node* now = state->now;
 			state->now = state->reverse ? now->prev : now->next;
+			return now;
 		}
-		void back(NodeIterator* state) {
+		Node* back(NodeIterator* state) {
 			Node* now = state->now;
 			state->now = state->reverse ? now->next : now->prev;
+			return now;
 		}
 	}
 	/*
@@ -406,93 +415,129 @@ namespace OrdenedLinkedMap {
 		- The left edge points to nullptr as right node if, and only if, the right edge points to nullptr (Double edge link nullability)
 		Returns non-zero on error. Otherwise, returns zero.
 	*/
-	int check_edges(const OrdenedLinkedMap* list) {
-			if(list->first == nullptr) 
-				return (list->last == nullptr) ? 0 : 1; 
-			if(list->last == nullptr)
-				return 2;
+	namespace check_edges {
+		enum EdgeStatus {
+			edge_nullability;
+			edge_leftlink_error;
+			edge_rightlink_error;
+			edge_leftnode_error;
+			edge_rightnode_error;
+		}
+		EdgeStatus check_edgenode(const OrdenedLinkedMap* list) {
 			if(list->first->prev != nullptr)
-				return 3;
+				return EdgeStatus::edge_leftnode_error;
 			if(list->last->next != nullptr)
-				return 4;
-			return 0;
+				return EdgeStatus::edge_rightnode_error;
+			return EdgeStatus::edge_nullability;
+		}
+		EdgeStatus check_edgelink(const OrdenedLinkedMap* list) {
+			if(list->first == nullptr) {
+				if(list->last == nullptr)
+					return EdgeStatus::edge_nullability;
+				return EdgeStatus::edge_rightlink_error;
+			}
+			if(list->last == nullptr)
+				return EdgeStatus::edge_leftnode_error;
+			return EdgeStatus::edge_nullability;
+		}
+		EdgeStatus check_edges(const OrdenedLinkedMap* list) {
+			EdgeStatus status = check_edgelink(list);
+			if(status != EdgeStatus::edge_nullability)
+				return status;
+			return check_edgenode(list);
+		}
 	}
+	
 	// checks for circular reference from end to begining. If exist returns the first node of circular reference. Otherwise, returns nullptr
-	#ifdef LINKMARK
-		#define DECRESCENT_LINKMARK 1
-		#define CRESCENT_LINKMARK 2 
-		#define REGULARITY_MARK 4
-	bool has_link_dec(const Node* now) {
-		return now->linkmark & DECRESCENT_LINKMARK;
-	}
-	bool has_link_cre(const Node* now) {
-		return now->linkmark & CRESCENT_LINKMARK;
-	}
-	Node* check_circular_dec(OrdenedLinkedMap* list) {
-		for(Node* n = list->last; n != nullptr && !has_link_dec(n); n = n->prev)
-			now->linkmark = now->linkmark | DECRESCENT_LINKMARK;
-		return n;
-	}
-	Node* check_circular_cre(OrdenedLinkedMap* list) {
-		for(Node* n = list->first; n != nullptr && !has_link_cre(n); n = n->next)
-			n->linkmark = n->linkmark | CRESCENT_LINKMARK;
-		return n;
-	}
-	bool check_reachable(const OrdenedLinkedMap* list) {
-		Node* first = list->first;
-		Node* last = list->last;
-		if(first != nullptr && last != nullptr) {
-			if(first->linkmark & DECRESCENT_LINKMARK)
+	namespace nodemark {
+		#ifdef LINKMARK
+			#define DECRESCENT_LINKMARK 1
+			#define CRESCENT_LINKMARK 2 
+			#define REGULARITY_MARK 4
+		bool has_linkmark(const Node* now, bool reverse) {
+			if(reverse) {
+				return now->linkmark & DECRESCENT_LINKMARK;
+			} else {
+				return now->linkmark & CRESCENT_LINKMARK;
+			}
+		}
+		Node* check_circularref(NodeIterator::NodeIterator* state) {
+			while(NodeIterator::isalive(state)) {
+				if(has_linkmark(state->now, state->reverse))
+					return state->now;
+				NodeIterator::next(state);
+			}
+			return nullptr;
+		}
+		bool check_reachable(const OrdenedLinkedMap* list) {
+			Node* first = list->first;
+			Node* last = list->last;
+			if(first != nullptr && last != nullptr) {
+				if(first->linkmark & DECRESCENT_LINKMARK)
+					return true;
+				if(last->linkmark & CRESCENT_LINKMARK)
+					return true;
+			}
+			return false;
+		}
+		const int CLEAR_LINKMARK = (DECRESCENT_LINKMARK | CRESCENT_LINKMARK);
+		const int CLEAR_REGULARITY = REGULARITY_MARK;
+		void clear_mark(NodeIterator::NodeIterator* state, int mask) {
+			while(NodeIterator::isalive()) {
+				Node* now = NodeIterator::next(state);
+				now->linkmark = now->linkmark ^ (now->linkmark & mask);
+			}
+		}
+		size_t get_omega(const Node* element, const Node** nodes, size_t amount) {
+			size_t pos = 0;
+			while(pos < amount && element != nodes[pos]) 
+				pos++;
+			return pos;
+		}
+		Node* search_garbage_by (NodeIterator::NodeIterator* state, Node** nodes, size_t amount) {
+			size_t pos;
+			while(NodeIterator::isalive()) {
+				Node* now = state->now;
+				if(!(now->linkmark & REGULARITY_MARK)) {
+					pos = get_omega(now, nodes, amount);
+					if(pos < amount) {
+						now->linkmark = now->linkmark | REGULARITY_MARK;
+					} else {
+						return now;
+					}
+				}
+				NodeIterator::next(state);
+			}
+			return nullptr;
+		}
+		bool check_crosslink_of(const Node* element) {
+				Node* prev = element->prev;
+				Node* next = element->next;
+					if(next != nullptr && next->prev != element)
+					return false;
+				if(prev != nullptr && prev->next != element)
+					return false;
 				return true;
-			if(last->linkmark & CRESCENT_LINKMARK)
-				return true;
+			}
+		Node* check_crosslink(NodeIterator::NodeIterator* state) {
+			while(NodeIterator::isalive(state)) {
+				if(!check_crosslink_of(now))
+					return now;
+				NodeIterator::next(state);
+			}
+			return nullptr;
 		}
-		return false;
+		#endif
 	}
-	void clear_linkmark_cre(const OrdenedLinkedMap* list) {
-		const int mask = (DECRESCENT_LINKMARK | CRESCENT_LINKMARK | REGULARITY_MARK);
-		for(Node* now = list->first; now != nullptr; now = now->next)
-			now->linkmark = now->linkmark ^ (now->linkmark & mask);
-	}
-	void clear_linkmark_dec(const OrdenedLinkedMap* list) {
-		const int mask = (DECRESCENT_LINKMARK | CRESCENT_LINKMARK | REGULARITY_MARK);
-		for(Node* now = list->last; now != nullptr; now = now->prev)
-			now->linkmark = now->linkmark ^ (now->linkmark & mask);
-	}
-	void check_regularity_dec() {
-		
-	}
-	bool check_crosslink_of(const Node* element) {
-			Node* prev = element->prev;
-			Node* next = element->next;
-			if(next != nullptr && next->prev != element)
-				return false;
-			if(prev != nullptr && prev->next != element)
-				return false;
-			return true;
-		}
-	Node* check_crosslink(NodeIterator::NodeIterator* state) {
-		while(NodeIterator::isalive(state)) {
-			if(!check_crosslink_of(now))
-				return now;
-			NodeIterator::next(*state)
-		}
-		return nullptr;
-	}
-	#endif
+	
 	namespace test {
+		using check_edges;
 		// prototypes
 		void test_edge_insertion(bool debug);
 		void test_string_comparation();
 		const char* get_cmp_symbol(int result);
 		void show_comparation_wstring(const std::wstring* left, const std::wstring* right);
 		void printnode(const Node* src);
-		bool check_ifin_pool(const Node* element, const Node** nodes, size_t amount);
-		Node* check_leftlink(const OrdenedLinkedMap* list, const Node** nodes, size_t amount);
-		Node* check_rightlink(const OrdenedLinkedMap* list, const Node** nodes, size_t amount);
-		bool check_edges(const OrdenedLinkedMap* list);
-		bool check_crosslink_of(const Node* element);
-		Node* check_crosslink(const OrdenedLinkedMap* list);
 		void printmap_left_int(const OrdenedLinkedMap* list);
 		void printmap_right_int(const OrdenedLinkedMap* list);
 		
@@ -511,22 +556,25 @@ namespace OrdenedLinkedMap {
 				Node* data = create_node(left_keys + i, left_values + i);
 				nodes[(left_nodes - 1) - i] = data;
 				appendLeft(&list, data);
-				assert(check_edges(&list));
+				assert(check_edges(&list) == edge_nullability);
 			}
 			for(size_t i = 0; i < right_nodes; i++) {
 				Node* data = create_node(right_keys + i, right_values + i);
 				nodes[left_nodes + i] = data;
 				appendRight(&list, data);
-				assert(check_edges(&list));
+				assert(check_edges(&list) == edge_nullability);
 			}
 			if(debug) {
+				NodeIterator::NodeIterator mapper;
 				printmap_left_int(&list);
 				std::wcout << std::endl;
 				printmap_right_int(&list);
+				std::wcout << std::endl;
+				create(mapper, &list)
 			}
-			assert(check_crosslink(&list) == nullptr);
-			assert(check_leftlink(&list, nodes, nodes_amount) == nullptr);
-			assert(check_rightlink(&list, nodes, nodes_amount) == nullptr);
+			//assert(check_crosslink(&list) == nullptr);
+			//assert(check_leftlink(&list, nodes, nodes_amount) == nullptr);
+			//assert(check_rightlink(&list, nodes, nodes_amount) == nullptr);
 		}
 		void test_string_comparation(){
 			const wchar_t* src[] = {L"é", L"és", L"bem", L"bom", L"já", L"com", L"de", L"e", L"e"};
@@ -554,50 +602,16 @@ namespace OrdenedLinkedMap {
 		void printnode(const Node* src){
 			std::wcout << "key=" << *((int*) src->key) << " ";
 			std::wcout << "adress=" << src << " ";
+			#ifdef LINKMARK
+			std::wcout << "linkmark= " << " ";
+			#endif
 			std::wcout << "value=" << *((int*) src->value) << std::endl;
 		}
-		bool check_ifin_pool(const Node* element, const Node** nodes, size_t amount) {
-			size_t pos = 0;
-			while(pos < amount && element != nodes[pos]) 
-				pos++;
-			return element == nodes[pos];
-		}
-		// itinerates and checks if the left links points to a node inside the pool. Returns nullptr, if sucessful. Otherwise, returns a pointer that's poisioned.
-		Node* check_rightlink(const OrdenedLinkedMap* list, const Node** nodes, size_t amount) {
-			for(Node* now = list->first; now != nullptr; now = now->next) {
-				if(!check_ifin_pool(now, nodes, amount))
-					return now;
+		void printmap_int(NodeIterator::NodeIterator* state) {
+			while(NodeIterator::isalive()) {
+				printnode(NodeIterator::next(state));
 			}
-			return nullptr;
 		}
-		// itinerates and checks if the right links points to a node inside the pool. Returns nullptr, if sucessful. Otherwise, returns a pointer that's poisioned.
-		Node* check_leftlink(const OrdenedLinkedMap* list, const Node** nodes, size_t amount) {
-			for(Node* now = list->last; now != nullptr; now = now->prev) {
-				if(!check_ifin_pool(now, nodes, amount))
-					return now;
-			}
-			return nullptr;
-		}
-		/* Check if both edge are valid:
-		- The left edge shall points to nullptr as left key=node
-		- The right edge shall points to nullptr as right node
-		- The left edge points to nullptr as right node if, and only if, the right edge points to nullptr 
-		*/
-		bool check_edges(const OrdenedLinkedMap* list) {
-			if(list->first == nullptr) 
-				return list->last == nullptr; 
-			if(list->last == nullptr)
-				return false;
-			if(list->first->prev != nullptr)
-				return false;
-			if(list->last->next != nullptr)
-				return false;
-			return true;
-		}
-		/* checks node correctly cross reference its counterpart:
-			- if B is the right node of A and B is not null, then A shall be the left node of B.
-			- if A is the left node of B and A is not null, then B shall be the right node of A
-		*/
 		void printmap_left_int(const OrdenedLinkedMap* list) {
 			for(Node* now = list->first; now != nullptr; now = now->next) {
 				printnode(now);
