@@ -755,7 +755,40 @@ namespace ordened_linked_map {
 			assert(!intv_empty(&state));
 		}
 		
-		
+		void test_find_or_create(){
+			Node* nodes [4];
+			Node* target;
+			int keys[] = {-1, 27, 44, 70};
+			int values[] = {-1, 21, 7, 21};
+			OrdenedLinkedMap list = {nullptr, nullptr, compare_int};
+			NodeIterator::NodeIterator mapper;
+			bool found;
+			nodes[0] = find_or_create(&list, keys, &found);
+			assert(!found);
+			assert(nodes[0]->value == nullptr);
+			
+			assert(find_or_create(&list, keys, &found) == nodes[0]);
+			assert(found);
+			
+			nodes[3] = find_or_create(&list, keys + 3, &found);
+			assert(!found);
+			
+			nodes[2] = find_or_create(&list, keys + 2, &found);
+			assert(!found);
+			
+			assert(find_or_create(&list, keys + 3, &found) == nodes[3]);
+			assert(found);
+			assert(find_or_create(&list, keys + 2, &found) == nodes[2]);
+			assert(found);
+			
+			nodes[1] = find_or_create(&list, keys + 1, &found);
+			assert(!found);
+			
+			for(size_t i = 0; i < 4; i++) {
+				assert(find_or_create(&list, keys + i, &found) == nodes[i]);
+				assert(found);
+			}
+		}
 		void show_cmp_wstring(const std::wstring* left, const std::wstring* right){
 			std::wcout << *left << L" ";
 			std::wcout << get_cmp_symbol(compare_wstring(left, right));
@@ -872,11 +905,12 @@ void tests(){
 	filenames[2] = "test3.txt";
 	filenames[3] = "test4.txt";
 	//LineReaderFile::test::test(filenames, 3);
-	//OrdenedLinkedMap::test::test_string_comparation();
-	//OrdenedLinkedMap::test::test_edge_insertion(true);
-	//OrdenedLinkedMap::test::test_check_edge();
-	//OrdenedLinkedMap::test::test_partial_search();
-	word_counter::test::simple_test();
+	//ordened_linked_map::test::test_string_comparation();
+	//ordened_linked_map::test::test_edge_insertion(true);
+	//ordened_linked_map::test::test_check_edge();
+	//ordened_linked_map::test::test_partial_search();
+	ordened_linked_map::test::test_find_or_create();
+	//word_counter::test::simple_test();
 }
 int main() {
 	//std::locale::global (std::locale (""));
