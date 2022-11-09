@@ -129,7 +129,7 @@ namespace LineReaderFile {
 		}
 	}
 }
-namespace OrdenedLinkedMap {
+namespace ordened_linked_map {
 	/*
 	expeted a function that returns:
 		-1, if the left element is lesser than right element
@@ -170,6 +170,11 @@ namespace OrdenedLinkedMap {
 		Node* last; // the last node (right edge) of the ordened linked map
 		cmp_fn compare; // trampoline: the function used for comparing
 	};
+	void initalize_empty(OrdenedLinkedMap* list, cmp_fn compare) {
+		list->first = nullptr;
+		list->last = nullptr;
+		list->compare = compare;
+	}
 	namespace NodeIterator {
 		struct NodeIterator {
 			Node* now;
@@ -358,49 +363,44 @@ namespace OrdenedLinkedMap {
 	SearchInterval* partial_find(SearchInterval* state, OrdenedLinkedMap* list, void* key) {
 		/*
 		The target is the node the first node that key field is equal to "key"
-		A candidate is a node that could be the target. Exists up to one candidate, because the fields's value of all nodes after the first candidate are greater than key, and, therefore, all subsequent nodes aren't candidates.
+		A candidate is a node that could be the target. Exists up to one candidate, because the key fields's value of all nodes after the first candidate are greater than key, and, therefore, all subsequent nodes aren't candidates.
 		*/
-		//std::wcout << "------searching=" << *((int*) key) << std::endl;
 		clear_search_interval(state);
 		cmp_fn compare = list->compare; // store the function to compare in the stack
-		Node* pre = nullptr; // the last node that was lesser than key (null-initialization)
+		Node* pre = nullptr; // If exists at least one element in the list, then it will be pointer to last element that is lesser than key. Otherwise, it will remain as nullptr
 		Node* now = list->first; // A candidate, if exists. Otherwise, it is nullptr (including the case of the list begin empty, that is, when list->first is nullptr). 
 		int cmp = 0; // Comparation flag. Non-zero means that the candidate was found. 
 		while(now != nullptr) {
 			/*
-			compare(now, key) + 1 == 0 --> now < key
-			compare(now, key) + 1 == 1 --> now == key
-			compare(now, key) + 1 == 2 --> now > key
+			compare(now->key, key) + 1 == 0 --> now->key < key
+			compare(now->key, key) + 1 == 1 --> now->key == key
+			compare(now->key, key) + 1 == 2 --> now->key > key
 			*/
 			cmp = compare(now->key, key) + 1; // update the comparation flag
-			//std::wcout << *((int*) now->key) << get_cmp_symbol(cmp - 1) << *((int*) key) << std::endl;
-			if(cmp != 0)
+			if(cmp != 0) // now->key < key
 				break;
-			pre = now; // update the last node (now != nullptr)
-			now = now->next; // now->next == nullptr if and only if the list reached the end
-		} /*
-		The field "next" last element of the ordened linked map shall be nullptr. So, if "now" is nullptr, then all element are lesser than "key". Otherwise, "now" is a element that is greater or equal to "key". 
-		If exists at least one element in the list, then "prev" will pointer to last element that is lesser than key. But, if the list is empty, then "prev" remains as nullptr
-		*/
-		if(cmp == 2) {
-			state->gt = now;
-		} else if (cmp == 1) {
-			state->eq = now;
-		} else { // Reached the end or the list is empty
-			state->lt = now;
-			return state;
+			// now->key < key
+			pre = now; // update the last node
+			now = now->next; // advance to next node
 		}
-		state->lt = pre; // The list is not empty
-		//std::wcout << "now->key=" << *((int*) now->key) << std::endl;
-		//if(pre != nullptr)
-			//std::wcout << "pre->key=" << *((int*) pre->key) << std::endl;
+		state->lt = pre; // The variable "pre" contains the last node that is lesser than the target, or nullptr if not exists.
+		// "Now" will be nullptr if, and only if, "cmp" is not equal to zero.
+		if(cmp == 0) // there isn't a node is greater or equal to target.
+			return state;
+		// "now" is the candidate
+		if(cmp == 2) { // target was not found
+			state->gt = now; // the candidate is the first node that key is greater than target
+		} else { // target was found
+			state->eq = now; // the candidate is the target
+			state->gt = now->next; // the greater neightbor is the first node that key is greater than target
+		}
 		return state;
 	}
 	/*
 	return a boolean value representing if the ordened linked map was empty when the partial_find() was done. This could depends of how partial_find() was implemented, therefore should be always used for this situation.
 	*/
 	bool intv_empty(SearchInterval* source){
-		return source->lt == nullptr;
+		return source->eq == nullptr && source->lt == nullptr && source->gt == nullptr;
 	}
 	bool intv_found(SearchInterval* source) {
 		return source->eq != nullptr;
@@ -408,8 +408,8 @@ namespace OrdenedLinkedMap {
 	// the cmp_fn implementation for type "int"*((int*) left);
 	int compare_int(const void* left, const void* right) {
 		int ileft = *((int*) left);
-		int iright = *((int*) right);
-		if(ileft < iright)
+		int iright = *((int*) right); 
+		if(ileft < iright) 
 			return -1;
 		if(ileft == iright)
 			return 0;
@@ -427,16 +427,40 @@ namespace OrdenedLinkedMap {
 		std::wstring sright = *((std::wstring*) right);
 		return sleft.compare(sright);
 	}
-	Node* create_node(void* key, void* value) {
-		Node* tmp = new Node;
-		tmp->key = key;
-		tmp->value = value;
-		tmp->next = nullptr;
-		tmp->prev = nullptr;
+	// initialize the node with defaults values 
+	void init_node(Node* into, void* key, void* value) {
+		into->key = key; // assign the key
+		into->value = value; // assign the value
+		into->next = nullptr; // null-initialization
+		into->prev = nullptr; // null-initialization
 		#ifdef LINKMARK
-		tmp->linkmark = CREATION_MARK;
+		into->linkmark = CREATION_MARK;
 		#endif
-		return tmp;
+	}
+	// create a node in the heap and then initialize with defaults value
+	Node* create_node(void* key, void* value) {
+		Node* tmp = new Node; // create a node in heap 
+		init_node(tmp, key, value); // initialize with defaults value
+		return tmp; // returns the node
+	}
+	/*
+	Atomically returns a node that contains the key, if exists; or create and returns a new node, if not exists.
+	[Warnings]:
+		(1) If not exists a node that contains the key, then will be created a new node that has the field value as nullptr. Make sure to properly initializate or handle the nullptr in value
+	*/
+	Node* find_or_create(OrdenedLinkedMap* list, void* key, bool* found) {
+		SearchInterval state; // create a temporary state machine
+		*found = intv_found(partial_find(&state, list, key));
+		if(*found) { // the key was found
+			return state.eq; // return the node that contains the key
+		}
+		Node* element = create_node(key, nullptr);	// as said in warning (1)
+		if(intv_empty(&state)) { // the list is empty
+			appendLeft(list, element); // insert at begining
+		} else {
+			insertBetween(list, element, state.lt, state.gt); // insert between the node last node that is lesser than target; and the first node that is greater than target
+		}
+		return element; // return the element which is properly poisitioned, but partially initialized
 	}
 	/* Check if both edge are valid:
 		- The left edge shall points to nullptr as left node (edge node nullability)
@@ -444,24 +468,6 @@ namespace OrdenedLinkedMap {
 		- The left edge points to nullptr as right node if, and only if, the right edge points to nullptr (Double edge link nullability)
 		Returns non-zero on error. Otherwise, returns zero.
 	*/
-	/*
-	Atomically returns a node that contains the element, if exists; or create and returns a new node, if not exists.
-	*/
-	Node* find_or_create(OrdenedLinkedMap* list, void* key, bool* found) {
-		SearchInterval state;
-		*found = intv_found(partial_find(&state, list, key));
-		if(*found) {
-			return state.eq;
-		}
-		Node* element = create_node(key, nullptr);		
-		if(intv_empty(&state)) {
-			appendLeft(list, element);
-		} else {
-			insertBetween(list, element, state.lt, state.gt);
-		}
-		return element;
-	}
-	
 	namespace check_edge {
 		enum EdgeStatus {
 			edge_nullability,
@@ -469,24 +475,24 @@ namespace OrdenedLinkedMap {
 			edge_rightlink_error,
 			edge_leftnode_error,
 			edge_rightnode_error,
-			unknown_edgestatus
+			unknown_edgestatus 
 		};
 		EdgeStatus check_edgenode(const OrdenedLinkedMap* list) {
-			if(list->first->prev != nullptr)
+			if(list->first->prev != nullptr) // error in left edge node
 				return EdgeStatus::edge_leftnode_error;
-			if(list->last->next != nullptr)
+			if(list->last->next != nullptr) // error in right edge node
 				return EdgeStatus::edge_rightnode_error;
-			return EdgeStatus::edge_nullability;
+			return EdgeStatus::edge_nullability; // sucess
 		}
 		EdgeStatus check_edgelink(const OrdenedLinkedMap* list) {
 			if(list->first == nullptr) {
-				if(list->last == nullptr)
+				if(list->last == nullptr) // both edges are nullptr (sucess)
 					return EdgeStatus::edge_nullability;
-				return EdgeStatus::edge_rightlink_error;
-			}
-			if(list->last == nullptr)
-				return EdgeStatus::edge_leftlink_error;
-			return EdgeStatus::unknown_edgestatus;
+				return EdgeStatus::edge_rightlink_error; // the right edge shall be nullptr (error) 
+			}  // the left edge is not nullptr
+			if(list->last == nullptr) // the right edge is nullptr (error)
+				return EdgeStatus::edge_leftlink_error; // the left edge shall be nullptr
+			return EdgeStatus::unknown_edgestatus; // the edge links are sane. But the edge nodes status still not covered
 		}
 		EdgeStatus check_edges(const OrdenedLinkedMap* list) {
 			EdgeStatus status = check_edgelink(list);
@@ -539,7 +545,6 @@ namespace OrdenedLinkedMap {
 			return nullptr;
 		}
 	}
-	// checks for circular reference from end to begining. If exist returns the first node of circular reference. Otherwise, returns nullptr
 	namespace soft_linkcheck {
 		#ifdef LINKMARK
 		bool has_linkmark(const Node* now, bool reverse) {
@@ -600,10 +605,8 @@ namespace OrdenedLinkedMap {
 		// prototypes
 		void test_edge_insertion(bool debug);
 		void test_string_comparation();
-		void show_comparation_wstring(const std::wstring* left, const std::wstring* right);
+		void show_cmp_wstring(const std::wstring* left, const std::wstring* right);
 		void printnode_int(const Node* src);
-		//void printmap_left_int(const OrdenedLinkedMap* list);
-		//void printmap_right_int(const OrdenedLinkedMap* list);
 		void printmap_int(NodeIterator::NodeIterator* state);
 		void test_check_edge(){
 			Node* nodes [3];
@@ -681,7 +684,7 @@ namespace OrdenedLinkedMap {
 				text[i] = new std::wstring(src[i]);
 			std::wcout << std::flush;
 			for(size_t i = 0; i < 8; i++) {
-				show_comparation_wstring(text[i], text[i+1]);
+				show_cmp_wstring(text[i], text[i+1]);
 			}
 			std::wcout << std::endl;
 		}
@@ -703,36 +706,57 @@ namespace OrdenedLinkedMap {
 			assert(state.lt == nullptr);
 			assert(state.eq == nullptr);
 			assert(state.gt == nodes[2]);
+			assert(!intv_empty(&state));
 			
 			partial_find(&state, &list, keys + 2);
 			assert(state.lt == nullptr);
 			assert(state.eq == nodes[2]);
 			assert(state.gt == nullptr);
+			assert(!intv_empty(&state));
 			
 			appendLeft(&list, nodes[0]);
-			//printmap_int(NodeIterator::create(&mapper, list.first));
 			
 			partial_find(&state, &list, keys);
 			assert(state.lt == nullptr);
 			assert(state.eq == nodes[0]);
-			assert(state.gt == nullptr);
+			assert(state.gt == nodes[2]);
+			assert(!intv_empty(&state));
 			
 			partial_find(&state, &list, keys + 1);
 			assert(state.lt == nodes[0]);
 			assert(state.eq == nullptr);
 			assert(state.gt == nodes[2]);
+			assert(!intv_empty(&state));
 			
 			partial_find(&state, &list, keys + 2);
 			assert(state.lt == nodes[0]);
 			assert(state.eq == nodes[2]);
 			assert(state.gt == nullptr);
+			assert(!intv_empty(&state));
 			
-			insertBetween(&list, nodes[1], nodes[0], nodes[1]);
-			//printmap_int(NodeIterator::create(&mapper, list.first));
-			//printmap_int(NodeIterator::createReverse(&mapper, list.last));
+			insertBetween(&list, nodes[1], nodes[0], nodes[2]);
+			
+			partial_find(&state, &list, keys);
+			assert(state.lt == nullptr);
+			assert(state.eq == nodes[0]);
+			assert(state.gt == nodes[1]);
+			assert(!intv_empty(&state));
+			
+			partial_find(&state, &list, keys + 1);
+			assert(state.lt == nodes[0]);
+			assert(state.eq == nodes[1]);
+			assert(state.gt == nodes[2]);
+			assert(!intv_empty(&state));
+			
+			partial_find(&state, &list, keys + 2);
+			assert(state.lt == nodes[1]);
+			assert(state.eq == nodes[2]);
+			assert(state.gt == nullptr);
+			assert(!intv_empty(&state));
 		}
 		
-		void show_comparation_wstring(const std::wstring* left, const std::wstring* right){
+		
+		void show_cmp_wstring(const std::wstring* left, const std::wstring* right){
 			std::wcout << *left << L" ";
 			std::wcout << get_cmp_symbol(compare_wstring(left, right));
 			std::wcout << L" " << *right << std::endl;
@@ -745,25 +769,118 @@ namespace OrdenedLinkedMap {
 			#endif
 			std::wcout << "value=" << *((int*) src->value) << std::endl;
 		}
+		
 		void printmap_int(NodeIterator::NodeIterator* state) {
 			while(NodeIterator::isalive(state))
 				printnode_int(NodeIterator::next(state));
 		}
 	}
 }
-int main() {
+namespace word_counter {
+	namespace LLDE = ordened_linked_map;
+	namespace NodeIterator = LLDE::NodeIterator;
+	struct WordCounter {
+		LLDE::OrdenedLinkedMap* list;
+		size_t src_id;
+		size_t amount;
+	};
+	void initialize(WordCounter* state, LLDE::cmp_fn compare, size_t amount) {
+		state->list = new LLDE::OrdenedLinkedMap;
+		LLDE::initalize_empty(state->list, compare);
+		state->amount = amount;
+		state->src_id = 0;
+	}
+	void initialize_wstring(WordCounter* state, size_t amount) {
+		initialize(state, LLDE::compare_wstring, amount);
+	}
+	void initialize_string(WordCounter* state, size_t amount) {
+		initialize(state, LLDE::compare_string, amount);
+	}
+	void next_source(WordCounter* state) {
+		state->src_id++;
+	}
+	bool isalive(WordCounter* state) {
+		return state->src_id < state->amount;
+	}
+	bool insert_word(WordCounter* state, void* word) {
+		bool found;
+		LLDE::Node* element = LLDE::find_or_create(state->list, word, &found);
+		if(!found)
+			element->value = new size_t[state->amount];
+		size_t* counter =  (size_t*) element->value;
+		counter[state->src_id]++;
+		return found;
+	}
+	bool insert_word(WordCounter* state, std::wstring* word) {
+		return insert_word(state, (void*) word);
+	}
+	bool insert_word(WordCounter* state, std::string* word) {
+		return insert_word(state, (void*) word);
+	}
+	void insert_or_dealloc(WordCounter* state, std::wstring* word) {
+		if(insert_word(state, word))
+			delete word;
+	}
+	void insert_or_dealloc(WordCounter* state, std::string* word) {
+		if(insert_word(state, word))
+			delete word;
+	}
+	namespace test {
+		void simple_test(){
+			std::wstring* words[26];
+			WordCounter counter;
+			const wchar_t* sources[] = {
+				L"Hello", L"my", L"darling", L"friend.", // 4
+				L"would", L"you", L"like", L"to", L"hang", // 9
+				L"out", L"a", L"bit", L"more?", //13
+				L"would", L"you", L"enjoy", L"to", L"be", L"out", //19
+				L"a", L"bit", L"more?", L"even", L"if", L"take", L"one", // 26
+				L"hour?"
+			};
+			for(size_t i = 0; i < 26; i++)
+				words[i] = new std::wstring(sources[i]);
+			for(size_t i = 0; i < 26; i++)
+				std::wcout << *words[i] << std::endl;
+			/*for(size_t i = 0; i < 12; i++)
+				insert_word(&counter, sources + i);
+			next_source(&counter);
+			for(size_t i = 12; i < 26; i++)
+				insert_word(&counter, sources + i);*/
+			
+		}
+		void debug_wstring(WordCounter* counter){
+			NodeIterator::NodeIterator state;
+			NodeIterator::create(&state, counter->list->first);
+			size_t amount = counter->amount;
+			while(NodeIterator::isalive(&state)) {
+				std::wcout << "key: " << *((std::wstring*) state.now->key) << " ";
+				//std::wcout << "adress=" << state->now << " ";
+				std::wcout << "value: ";
+				size_t* value = (size_t*) state.now->value;
+				for(size_t i = 0; i < amount; i++)
+					std::wcout << " " << value[i];
+				std::wcout << std::endl;
+			}
+		}
+	}
+}
+void tests(){
 	const char* filenames[4];
-	//std::locale::global (std::locale (""));
-	setlocale(LC_ALL, "");
 	std::wcout << L"";
 	filenames[0] = "test1.txt";
 	filenames[1] = "test2.txt";
 	filenames[2] = "test3.txt";
 	filenames[3] = "test4.txt";
-	LineReaderFile::test::test(filenames, 3);
-	OrdenedLinkedMap::test::test_string_comparation();
-	OrdenedLinkedMap::test::test_edge_insertion(true);
-	OrdenedLinkedMap::test::test_check_edge();
-	OrdenedLinkedMap::test::test_partial_search();
+	//LineReaderFile::test::test(filenames, 3);
+	//OrdenedLinkedMap::test::test_string_comparation();
+	//OrdenedLinkedMap::test::test_edge_insertion(true);
+	//OrdenedLinkedMap::test::test_check_edge();
+	//OrdenedLinkedMap::test::test_partial_search();
+	word_counter::test::simple_test();
+}
+int main() {
+	//std::locale::global (std::locale (""));
+	setlocale(LC_ALL, "");
+	tests();
 	return 0;
 }
