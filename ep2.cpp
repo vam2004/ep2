@@ -136,7 +136,8 @@ namespace ordened_linked_map {
 		0, if the left element is equal to right element
 		1, if the left element is greater than right
 	*/
-	using cmp_fn = int (*)(const void*, const void*);
+	template<typename key_t>
+	using cmp_fn = int (*)(const key_t*, const key_t*);
 	const char* get_cmp_symbol(int result) {
 		if (result == -1)
 			return "<";
@@ -153,11 +154,12 @@ namespace ordened_linked_map {
 		#define CRESCENT_LINKMARK 2 
 		#define CREATION_MARK 4
 	#endif
+	template<typename key_t, typename value_t>
 	struct Node {
-		void* key; // the value used for referencing 
-		void* value; // the value begin referencied
-		Node* prev; // previuos (left) node in the ordened linked map
-		Node* next; // next (right) node in the ordened linked map
+		key_t* key; // the value used for referencing 
+		value_t* value; // the value begin referencied
+		Node<key_t, value_t>* prev; // previuos (left) node in the ordened linked map
+		Node<key_t, value_t>* next; // next (right) node in the ordened linked map
 		#ifdef LINKMARK
 		int linkmark; // used for validating
 		#endif
@@ -165,58 +167,75 @@ namespace ordened_linked_map {
 	/*
 	The entry point of linked ordened map
 	*/
+	template<typename key_t, typename value_t>
 	struct OrdenedLinkedMap {
-		Node* first; // the first node (left egde) of the ordened linked map
-		Node* last; // the last node (right edge) of the ordened linked map
-		cmp_fn compare; // trampoline: the function used for comparing
+		Node<key_t, value_t>* first; // the first node (left egde) of the ordened linked map
+		Node<key_t, value_t>* last; // the last node (right edge) of the ordened linked map
+		cmp_fn<key_t> compare; // trampoline: the function used for comparing
 	};
-	void initalize_empty(OrdenedLinkedMap* list, cmp_fn compare) {
+	template<typename key_t, typename value_t>
+	void initalize_empty(OrdenedLinkedMap<key_t, value_t>* list, cmp_fn<key_t> compare) {
 		list->first = nullptr;
 		list->last = nullptr;
 		list->compare = compare;
 	}
 	namespace NodeIterator {
+		template<typename key_t, typename value_t>
 		struct NodeIterator {
-			Node* now;
+			Node<key_t, value_t>* now;
 			bool reverse;
 		};
 		// main prototypes
-		void rewind(NodeIterator* state, const OrdenedLinkedMap* list);
-		bool isalive(const NodeIterator* state);
-		bool isreverse(const NodeIterator* state);
-		void seekend(NodeIterator* state, const OrdenedLinkedMap* list);
-		Node* next(NodeIterator* state);
-		Node* back(NodeIterator* state);
+		template<typename key_t, typename value_t>
+		void rewind(NodeIterator<key_t, value_t>* state, const OrdenedLinkedMap<key_t, value_t>* list);
+		template<typename key_t, typename value_t>
+		bool isalive(const NodeIterator<key_t, value_t>* state);
+		template<typename key_t, typename value_t>
+		bool isreverse(const NodeIterator<key_t, value_t>* state);
+		template<typename key_t, typename value_t>
+		void seekend(NodeIterator<key_t, value_t>* state, const OrdenedLinkedMap<key_t, value_t>* list);
+		template<typename key_t, typename value_t>
+		Node<key_t, value_t>* next(NodeIterator<key_t, value_t>* state);
+		template<typename key_t, typename value_t>
+		Node<key_t, value_t>* back(NodeIterator<key_t, value_t>* state);
 		
-		NodeIterator* create(NodeIterator* state, Node* now) {
+		template<typename key_t, typename value_t>
+		NodeIterator<key_t, value_t>* create(NodeIterator<key_t, value_t>* state, Node<key_t, value_t>* now) {
 			state->reverse = false;
 			state->now = now;
 			return state;
 		}
-		NodeIterator* createReverse(NodeIterator* state, Node* now) {
+		template<typename key_t, typename value_t>
+		NodeIterator<key_t, value_t>* createReverse(NodeIterator<key_t, value_t>* state, Node<key_t, value_t>* now) {
 			state->reverse = true;
 			state->now = now;
 			return state;
 		}
-		bool isreverse(const NodeIterator* state) {
+		template<typename key_t, typename value_t>
+		bool isreverse(const NodeIterator<key_t, value_t>* state) {
 			return state->reverse;
 		}
-		bool isalive(const NodeIterator* state) {
+		template<typename key_t, typename value_t>
+		bool isalive(const NodeIterator<key_t, value_t>* state) {
 			return state->now != nullptr;
 		}
-		void rewind(NodeIterator* state, const OrdenedLinkedMap* list) {
+		template<typename key_t, typename value_t>
+		void rewind(NodeIterator<key_t, value_t>* state, const OrdenedLinkedMap<key_t, value_t>* list) {
 			state->now = state->reverse ? list->last : list->first;
 		}
-		void seekend(NodeIterator* state, const OrdenedLinkedMap* list) {
+		template<typename key_t, typename value_t>
+		void seekend(NodeIterator<key_t, value_t>* state, const OrdenedLinkedMap<key_t, value_t>* list) {
 			state->now = state->reverse ? list->first : list->last;
 		}
-		Node* next(NodeIterator* state) {
-			Node* now = state->now;
+		template<typename key_t, typename value_t>
+		Node<key_t, value_t>* next(NodeIterator<key_t, value_t>* state) {
+			Node<key_t, value_t>* now = state->now;
 			state->now = state->reverse ? now->prev : now->next;
 			return now;
 		}
-		Node* back(NodeIterator* state) {
-			Node* now = state->now;
+		template<typename key_t, typename value_t>
+		Node<key_t, value_t>* back(NodeIterator<key_t, value_t>* state) {
+			Node<key_t, value_t>* now = state->now;
 			state->now = state->reverse ? now->next : now->prev;
 			return now;
 		}
@@ -224,10 +243,11 @@ namespace ordened_linked_map {
 	/*
 	The result of partialSearch().
 	*/
+	template<typename key_t, typename value_t>
 	struct SearchInterval {
-		Node* lt; // the node that is lesser than the target (nullptr if not exists)
-		Node* eq; // the node that is equal to the target (nullptr if not exists)
-		Node* gt; // the node that is great than the target (nullptr if not exists)
+		Node<key_t, value_t>* lt; // the node that is lesser than the target (nullptr if not exists)
+		Node<key_t, value_t>* eq; // the node that is equal to the target (nullptr if not exists)
+		Node<key_t, value_t>* gt; // the node that is great than the target (nullptr if not exists)
 	};
 	/*
 	Insert a element at the left side of another. If the "position" is the left edge of linked ordened map then inserts and update that.
@@ -238,8 +258,9 @@ namespace ordened_linked_map {
 		(4) The fields pointer to left and right nodes of "element" should be nullptr. Because these pointers could be overwriten (pontential memory leak).
 		(5) The function doesn't validate ordering
 	*/
-	void insertLeft(OrdenedLinkedMap* list, Node* element, Node* position) {
-		Node* previuos = position->prev; // copy the reference to left node of "position"
+	template<typename key_t, typename value_t>
+	void insertLeft(OrdenedLinkedMap<key_t, value_t>* list, Node<key_t, value_t>* element, Node<key_t, value_t>* position) {
+		Node<key_t, value_t>* previuos = position->prev; // copy the reference to left node of "position"
 		element->next = position; // (1) link "position" as the right node of "element"
 		element->prev = previuos; // (2) link "previuos" as the left node of "element"
 		position->prev = element; // (3) link "element" as the left node of "element"
@@ -276,8 +297,9 @@ namespace ordened_linked_map {
 		(4) The fields pointer to left and right nodes of "element" should be nullptr. Because these pointers will be overwriten (pontential memory leak).
 		(5) The function doesn't validate ordering
 	*/
-	void insertRight(OrdenedLinkedMap* list, Node* element, Node* position) {
-		Node* next = position->next; // copy the reference to left node of "position"
+	template<typename key_t, typename value_t>
+	void insertRight(OrdenedLinkedMap<key_t, value_t>* list, Node<key_t, value_t>* element, Node<key_t, value_t>* position) {
+		Node<key_t, value_t>* next = position->next; // copy the reference to left node of "position"
 		element->next = next; // (1) link "next" as the right node of "element"
 		element->prev = position; // (2) link "position" as the left node of "element"
 		position->next = element; // (3) link "element" as the right node of "position"
@@ -312,8 +334,9 @@ namespace ordened_linked_map {
 		(1) If the linked ordened map is empty, then the left edge shall be nullptr
 		(2) Inherits warnings (1), (3), (4) and (5) from insertLeft()
 	*/
-	void appendLeft(OrdenedLinkedMap* list, Node* element) {
-		Node* first = list->first;
+	template<typename key_t, typename value_t>
+	void appendLeft(OrdenedLinkedMap<key_t, value_t>* list, Node<key_t, value_t>* element) {
+		Node<key_t, value_t>* first = list->first;
 		if(first == nullptr) { // the linked ordened map is empty
 			list->first = element; // if the linked ordened map is not empty, the left edge shalln't be nullptr
 			list->last = element; // if the linked ordened map is not empty, the right edge shalln't be nullptr
@@ -328,8 +351,9 @@ namespace ordened_linked_map {
 		(1) If the linked ordened map is empty, then the right edge shall be nullptr
 		(2) Inherits warnings (1), (3), (4) and (5) from insertRight()
 	*/
-	void appendRight(OrdenedLinkedMap* list, Node* element) {
-		Node* last = list->last;
+	template<typename key_t, typename value_t>
+	void appendRight(OrdenedLinkedMap<key_t, value_t>* list, Node<key_t, value_t>* element) {
+		Node<key_t, value_t>* last = list->last;
 		if(last == nullptr) {
 			list->first = element; // if the linked ordened map is not empty, the left edge shalln't be nullptr
 			list->last = element; // if the linked ordened map is not empty, the right edge shalln't be nullptr
@@ -346,7 +370,8 @@ namespace ordened_linked_map {
 		(3) Inherits warnings (1) and (2) from appendRight()
 		(4) Both "left" and "right"
 	*/
-	void insertBetween(OrdenedLinkedMap* list, Node* element, Node* left, Node* right) {
+	template<typename key_t, typename value_t>
+	void insertBetween(OrdenedLinkedMap<key_t, value_t>* list, Node<key_t, value_t>* element, Node<key_t, value_t>* left, Node<key_t, value_t>* right) {
 		//assert(left != nullptr && left->next == right); // as said in warning (1)
 		//assert(right != nullptr && right->prev == left); // as said in warning (2)
 		if(left == nullptr) { // right is the left edge of ordened linked map
@@ -355,20 +380,22 @@ namespace ordened_linked_map {
 			insertRight(list, element, left); // insert at right side of "left" (and therefore at left side of "right")
 		}
 	}
-	void clear_search_interval(SearchInterval* into) {
+	template<typename key_t, typename value_t>
+	void clear_search_interval(SearchInterval<key_t, value_t>* into) {
 		into->lt = nullptr;
 		into->eq = nullptr;
 		into->gt = nullptr;
 	}
-	SearchInterval* partial_find(SearchInterval* state, OrdenedLinkedMap* list, void* key) {
+	template<typename key_t, typename value_t>
+	SearchInterval<key_t, value_t>* partial_find(SearchInterval<key_t, value_t>* state, OrdenedLinkedMap<key_t, value_t>* list, void* key) {
 		/*
 		The target is the node the first node that key field is equal to "key"
 		A candidate is a node that could be the target. Exists up to one candidate, because the key fields's value of all nodes after the first candidate are greater than key, and, therefore, all subsequent nodes aren't candidates.
 		*/
 		clear_search_interval(state);
-		cmp_fn compare = list->compare; // store the function to compare in the stack
-		Node* pre = nullptr; // If exists at least one element in the list, then it will be pointer to last element that is lesser than key. Otherwise, it will remain as nullptr
-		Node* now = list->first; // A candidate, if exists. Otherwise, it is nullptr (including the case of the list begin empty, that is, when list->first is nullptr). 
+		cmp_fn<key_t> compare = list->compare; // store the function to compare in the stack
+		Node<key_t, value_t>* pre = nullptr; // If exists at least one element in the list, then it will be pointer to last element that is lesser than key. Otherwise, it will remain as nullptr
+		Node<key_t, value_t>* now = list->first; // A candidate, if exists. Otherwise, it is nullptr (including the case of the list begin empty, that is, when list->first is nullptr). 
 		int cmp = 0; // Comparation flag. Non-zero means that the candidate was found. 
 		while(now != nullptr) {
 			/*
@@ -399,19 +426,19 @@ namespace ordened_linked_map {
 	/*
 	return a boolean value representing if the ordened linked map was empty when the partial_find() was done. This could depends of how partial_find() was implemented, therefore should be always used for this situation.
 	*/
-	bool intv_empty(SearchInterval* source){
+	template<typename key_t, typename value_t>
+	bool intv_empty(SearchInterval<key_t, value_t>* source){
 		return source->eq == nullptr && source->lt == nullptr && source->gt == nullptr;
 	}
-	bool intv_found(SearchInterval* source) {
+	template<typename key_t, typename value_t>
+	bool intv_found(SearchInterval<key_t, value_t>* source) {
 		return source->eq != nullptr;
 	}
 	// the cmp_fn implementation for type "int"*((int*) left);
-	int compare_int(const void* left, const void* right) {
-		int ileft = *((int*) left);
-		int iright = *((int*) right); 
-		if(ileft < iright) 
+	int compare_int(const int* left, const int* right) {
+		if(left < right) 
 			return -1;
-		if(ileft == iright)
+		if(left == right)
 			return 0;
 		return 1;
 	}
@@ -423,12 +450,16 @@ namespace ordened_linked_map {
 	}
 	// the cmp_fn implementation for type "std::wstring"
 	int compare_wstring(const void* left, const void* right) {
-		std::wstring sleft = *((std::wstring*) left);
-		std::wstring sright = *((std::wstring*) right);
-		return sleft.compare(sright);
+		//std::wstring sleft = *((std::wstring*) left);
+		//std::wstring sright = *((std::wstring*) right);
+		//return sleft.compare(sright);
+		std::wcout << "adress(left): " << left << std::endl;
+		std::wcout << "adress(right): " << right << std::endl;
+		return -1;
 	}
 	// initialize the node with defaults values 
-	void init_node(Node* into, void* key, void* value) {
+	template<typename key_t, typename value_t>
+	void init_node(Node<key_t, value_t>* into, key_t* key, value_t* value) {
 		into->key = key; // assign the key
 		into->value = value; // assign the value
 		into->next = nullptr; // null-initialization
@@ -438,8 +469,9 @@ namespace ordened_linked_map {
 		#endif
 	}
 	// create a node in the heap and then initialize with defaults value
-	Node* create_node(void* key, void* value) {
-		Node* tmp = new Node; // create a node in heap 
+	template<typename key_t, typename value_t>
+	Node<key_t, value_t>* create_node(key_t* key, value_t* value) {
+		Node<key_t, value_t>* tmp = new Node<key_t, value_t>; // create a node in heap 
 		init_node(tmp, key, value); // initialize with defaults value
 		return tmp; // returns the node
 	}
@@ -448,13 +480,14 @@ namespace ordened_linked_map {
 	[Warnings]:
 		(1) If not exists a node that contains the key, then will be created a new node that has the field value as nullptr. Make sure to properly initializate or handle the nullptr in value
 	*/
-	Node* find_or_create(OrdenedLinkedMap* list, void* key, bool* found) {
-		SearchInterval state; // create a temporary state machine
+	template<typename key_t, typename value_t>
+	Node<key_t, value_t>* find_or_create(OrdenedLinkedMap<key_t, value_t>* list, key_t* key, bool* found) {
+		SearchInterval<key_t, value_t> state; // create a temporary state machine
 		*found = intv_found(partial_find(&state, list, key));
 		if(*found) { // the key was found
 			return state.eq; // return the node that contains the key
 		}
-		Node* element = create_node(key, nullptr);	// as said in warning (1)
+		Node<key_t, value_t>* element = create_node<key_t, value_t>(key, nullptr);	// as said in warning (1)
 		if(intv_empty(&state)) { // the list is empty
 			appendLeft(list, element); // insert at begining
 		} else {
@@ -477,14 +510,16 @@ namespace ordened_linked_map {
 			edge_rightnode_error,
 			unknown_edgestatus 
 		};
-		EdgeStatus check_edgenode(const OrdenedLinkedMap* list) {
+		template<typename key_t, typename value_t>
+		EdgeStatus check_edgenode(const OrdenedLinkedMap<key_t, value_t>* list) {
 			if(list->first->prev != nullptr) // error in left edge node
 				return EdgeStatus::edge_leftnode_error;
 			if(list->last->next != nullptr) // error in right edge node
 				return EdgeStatus::edge_rightnode_error;
 			return EdgeStatus::edge_nullability; // sucess
 		}
-		EdgeStatus check_edgelink(const OrdenedLinkedMap* list) {
+		template<typename key_t, typename value_t>
+		EdgeStatus check_edgelink(const OrdenedLinkedMap<key_t, value_t>* list) {
 			if(list->first == nullptr) {
 				if(list->last == nullptr) // both edges are nullptr (sucess)
 					return EdgeStatus::edge_nullability;
@@ -494,7 +529,8 @@ namespace ordened_linked_map {
 				return EdgeStatus::edge_leftlink_error; // the left edge shall be nullptr
 			return EdgeStatus::unknown_edgestatus; // the edge links are sane. But the edge nodes status still not covered
 		}
-		EdgeStatus check_edges(const OrdenedLinkedMap* list) {
+		template<typename key_t, typename value_t>
+		EdgeStatus check_edges(const OrdenedLinkedMap<key_t, value_t>* list) {
 			EdgeStatus status = check_edgelink(list);
 			if(status != EdgeStatus::unknown_edgestatus)
 				return status;
@@ -504,15 +540,17 @@ namespace ordened_linked_map {
 	
 	namespace hard_linkcheck {
 		using NodeIterator::isalive;
-		size_t get_omega(const Node* element, const Node** nodes, size_t amount) {
+		template<typename key_t, typename value_t>
+		size_t get_omega(const Node<key_t, value_t>* element, const Node<key_t, value_t>** nodes, size_t amount) {
 			size_t pos = 0;
 			while(pos < amount && element != nodes[pos]) 
 				pos++;
 			return pos;
 		}
-		Node* check_unordered (NodeIterator::NodeIterator* state, const Node** nodes, size_t amount) {
+		template<typename key_t, typename value_t>
+		Node<key_t, value_t>* check_unordered (NodeIterator::NodeIterator<key_t, value_t>* state, const Node<key_t, value_t>** nodes, size_t amount) {
 			while(isalive(state)) {
-				Node* now = state->now;
+				Node<key_t, value_t>* now = state->now;
 				#ifdef LINKMARK
 				if(!(now->linkmark & CREATION_MARK))
 					return now;
@@ -523,7 +561,8 @@ namespace ordened_linked_map {
 			}
 			return nullptr;
 		}
-		Node* check_positioned(NodeIterator::NodeIterator* state, const Node** nodes, size_t amount) {
+		template<typename key_t, typename value_t>
+		Node<key_t, value_t>* check_positioned(NodeIterator::NodeIterator<key_t, value_t>* state, const Node<key_t, value_t>** nodes, size_t amount) {
 			for(size_t i = 0; i < amount && isalive(state); i++) {
 				if(nodes[i] != state->now)
 					return state->now;
@@ -531,8 +570,9 @@ namespace ordened_linked_map {
 			}
 			return nullptr;
 		}
-		Node* check_ordered(NodeIterator::NodeIterator* state, cmp_fn compare) {
-			Node* prev = nullptr;
+		template<typename key_t, typename value_t>
+		Node<key_t, value_t>* check_ordered(NodeIterator::NodeIterator<key_t, value_t>* state, cmp_fn<key_t> compare) {
+			Node<key_t, value_t>* prev = nullptr;
 			int status = 0;
 			int exact = state->reverse ? 1 : -1;
 			while(isalive(state)) {
@@ -581,16 +621,18 @@ namespace ordened_linked_map {
 			}
 		}
 		#endif
-		bool check_crosslink_of(const Node* element) {
-				Node* prev = element->prev;
-				Node* next = element->next;
+		template<typename key_t, typename value_t>
+		bool check_crosslink_of(const Node<key_t, value_t>* element) {
+				Node<key_t, value_t>* prev = element->prev;
+				Node<key_t, value_t>* next = element->next;
 					if(next != nullptr && next->prev != element)
 					return false;
 				if(prev != nullptr && prev->next != element)
 					return false;
 				return true;
 			}
-		Node* check_crosslink(NodeIterator::NodeIterator* state) {
+		template<typename key_t, typename value_t>
+		Node<key_t, value_t>* check_crosslink(NodeIterator::NodeIterator<key_t, value_t>* state) {
 			while(NodeIterator::isalive(state)) {
 				if(!check_crosslink_of(state->now))
 					return state->now;
@@ -606,15 +648,17 @@ namespace ordened_linked_map {
 		void test_edge_insertion(bool debug);
 		void test_string_comparation();
 		void show_cmp_wstring(const std::wstring* left, const std::wstring* right);
-		void printnode_int(const Node* src);
-		void printmap_int(NodeIterator::NodeIterator* state);
+		template<typename key_t, typename value_t>
+		void printnode_int(const Node<key_t, value_t>* src);
+		template<typename key_t, typename value_t>
+		void printmap_int(NodeIterator::NodeIterator<key_t, value_t>* state);
 		void test_check_edge(){
-			Node* nodes [3];
+			Node<int, int>* nodes [3];
 			int keys[] = {11, 12, 14};
 			int values[] = {-1, 7, 21};
 			for(size_t i = 0; i < 3; i++)
 				nodes[i] = create_node(keys + i, values + i);
-			OrdenedLinkedMap list = {nullptr, nullptr, compare_int};
+			OrdenedLinkedMap<int, int> list = {nullptr, nullptr, compare_int};
 			
 			assert(check_edges(&list) == edge_nullability);
 			
@@ -689,105 +733,156 @@ namespace ordened_linked_map {
 			std::wcout << std::endl;
 		}
 		
-		void test_partial_search(){
-			Node* nodes [3];
-			int keys[] = {-1, 27, 44};
-			int values[] = {-1, 21, 7};
+		Node** test_partial_search(void* keys[3], OrdenedLinkedMap* list){
+			Node** nodes = new Node *[3];
 			for(size_t i = 0; i < 3; i++)
-				nodes[i] = create_node(keys + i, values + i);
-			OrdenedLinkedMap list = {nullptr, nullptr, compare_int};
+				nodes[i] = create_node(keys + i, nullptr);
 			SearchInterval state;
-			NodeIterator::NodeIterator mapper;
-			assert(intv_empty(partial_find(&state, &list, keys)));
+			assert(intv_empty(partial_find(&state, list, keys)));
 			
-			appendLeft(&list, nodes[2]);
+			appendLeft(list, nodes[2]);
 			
-			partial_find(&state, &list, keys);
+			partial_find(&state, list, keys);
 			assert(state.lt == nullptr);
 			assert(state.eq == nullptr);
 			assert(state.gt == nodes[2]);
 			assert(!intv_empty(&state));
 			
-			partial_find(&state, &list, keys + 2);
+			partial_find(&state, list, keys + 2);
 			assert(state.lt == nullptr);
 			assert(state.eq == nodes[2]);
 			assert(state.gt == nullptr);
 			assert(!intv_empty(&state));
 			
-			appendLeft(&list, nodes[0]);
+			appendLeft(list, nodes[0]);
 			
-			partial_find(&state, &list, keys);
+			partial_find(&state, list, keys);
 			assert(state.lt == nullptr);
 			assert(state.eq == nodes[0]);
 			assert(state.gt == nodes[2]);
 			assert(!intv_empty(&state));
 			
-			partial_find(&state, &list, keys + 1);
+			partial_find(&state, list, keys + 1);
 			assert(state.lt == nodes[0]);
 			assert(state.eq == nullptr);
 			assert(state.gt == nodes[2]);
 			assert(!intv_empty(&state));
 			
-			partial_find(&state, &list, keys + 2);
+			partial_find(&state, list, keys + 2);
 			assert(state.lt == nodes[0]);
 			assert(state.eq == nodes[2]);
 			assert(state.gt == nullptr);
 			assert(!intv_empty(&state));
 			
-			insertBetween(&list, nodes[1], nodes[0], nodes[2]);
+			insertBetween(list, nodes[1], nodes[0], nodes[2]);
 			
-			partial_find(&state, &list, keys);
+			partial_find(&state, list, keys);
 			assert(state.lt == nullptr);
 			assert(state.eq == nodes[0]);
 			assert(state.gt == nodes[1]);
 			assert(!intv_empty(&state));
 			
-			partial_find(&state, &list, keys + 1);
+			partial_find(&state, list, keys + 1);
 			assert(state.lt == nodes[0]);
 			assert(state.eq == nodes[1]);
 			assert(state.gt == nodes[2]);
 			assert(!intv_empty(&state));
 			
-			partial_find(&state, &list, keys + 2);
+			partial_find(&state, list, keys + 2);
 			assert(state.lt == nodes[1]);
 			assert(state.eq == nodes[2]);
 			assert(state.gt == nullptr);
 			assert(!intv_empty(&state));
+			return nodes;
 		}
-		
-		void test_find_or_create(){
-			Node* nodes [4];
-			Node* target;
-			int keys[] = {-1, 27, 44, 70};
-			int values[] = {-1, 21, 7, 21};
+		void test_psearch_int() {
+			int keys[] = {-1, 27, 44};
+			void* source[3];
+			for(size_t i = 0; i < 3; i++)
+				source[i] = keys + i;
 			OrdenedLinkedMap list = {nullptr, nullptr, compare_int};
-			NodeIterator::NodeIterator mapper;
+			Node** nodes = test_partial_search(source, &list);
+			for(size_t i = 0; i < 3; i++)
+				delete nodes[i];
+			delete[] nodes;
+		}
+		void test_psearch_wstring(){
+			std::wstring* keys[3];
+			void* source[3];
+			const wchar_t* sources[] = {
+				L"abc", L"abd", L"xyz",
+			};
+			for(size_t i = 0; i < 3; i++)
+				source[i] = keys[i] = new std::wstring(sources[i]);
+			OrdenedLinkedMap list = {nullptr, nullptr, compare_wstring};
+			for(size_t i = 0; i < 3; i++)
+				std::wcout << *((std::wstring*) source[i]) << std::endl;
+			//show_cmp_wstring((std::wstring*) source[0], (std::wstring*) source[1]);
+			//show_cmp_wstring((std::wstring*) source[1], (std::wstring*) source[2]);
+			Node** nodes = test_partial_search(source, &list);
+			
+			//NodeIterator::NodeIterator mapper;
+			//NodeIterator::create(mapper, &list);
+		}
+		Node** test_find_or_create(void* source[4], OrdenedLinkedMap* list){
+			Node** nodes = new Node *[4];
+			Node* target;
 			bool found;
-			nodes[0] = find_or_create(&list, keys, &found);
+			nodes[0] = find_or_create(list, source, &found);
 			assert(!found);
 			assert(nodes[0]->value == nullptr);
 			
-			assert(find_or_create(&list, keys, &found) == nodes[0]);
+			assert(find_or_create(list, source, &found) == nodes[0]);
 			assert(found);
 			
-			nodes[3] = find_or_create(&list, keys + 3, &found);
+			nodes[3] = find_or_create(list, source + 3, &found);
 			assert(!found);
 			
-			nodes[2] = find_or_create(&list, keys + 2, &found);
+			nodes[2] = find_or_create(list, source + 2, &found);
 			assert(!found);
 			
-			assert(find_or_create(&list, keys + 3, &found) == nodes[3]);
+			assert(find_or_create(list, source + 3, &found) == nodes[3]);
 			assert(found);
-			assert(find_or_create(&list, keys + 2, &found) == nodes[2]);
+			assert(find_or_create(list, source + 2, &found) == nodes[2]);
 			assert(found);
 			
-			nodes[1] = find_or_create(&list, keys + 1, &found);
+			nodes[1] = find_or_create(list, source + 1, &found);
 			assert(!found);
 			
 			for(size_t i = 0; i < 4; i++) {
-				assert(find_or_create(&list, keys + i, &found) == nodes[i]);
+				assert(find_or_create(list, source + i, &found) == nodes[i]);
 				assert(found);
+				assert(nodes[i] != nullptr);
+				assert(nodes[i]->value == nullptr);
 			}
+			return nodes;
+		}
+		void test_foc_int(){
+			int keys[4] = {-1, 27, 44, 70};
+			void* source[4];
+			for(size_t i = 0; i < 4; i++)
+				source[i] = keys + i;
+			OrdenedLinkedMap list = {nullptr, nullptr, compare_int};
+			Node** nodes = test_find_or_create(source, &list);
+			for(size_t i = 0; i < 4; i++)
+				delete nodes[i];
+			delete[] nodes;
+		}
+		void test_foc_wstring(){
+			std::wstring* keys[4];
+			void* src[4];
+			const wchar_t* sources[] = {
+				L"Hello", L"my", L"darling", L"friend",
+			};
+			for(size_t i = 0; i < 4; i++)
+				keys[i] = new std::wstring(sources[i]);
+			for(size_t i = 0; i < 4; i++)
+				src[i] = keys[i];
+			OrdenedLinkedMap list = {nullptr, nullptr, compare_wstring};
+			Node** nodes = test_find_or_create(src, &list);
+			
+			//NodeIterator::NodeIterator mapper;
+			//NodeIterator::create(mapper, &list);
 		}
 		void show_cmp_wstring(const std::wstring* left, const std::wstring* right){
 			std::wcout << *left << L" ";
@@ -908,8 +1003,10 @@ void tests(){
 	//ordened_linked_map::test::test_string_comparation();
 	//ordened_linked_map::test::test_edge_insertion(true);
 	//ordened_linked_map::test::test_check_edge();
-	//ordened_linked_map::test::test_partial_search();
-	ordened_linked_map::test::test_find_or_create();
+	//ordened_linked_map::test::test_psearch_int();
+	//ordened_linked_map::test::test_foc_int();
+	ordened_linked_map::test::test_psearch_wstring();
+	//ordened_linked_map::test::test_foc_wstring();
 	//word_counter::test::simple_test();
 }
 int main() {
