@@ -893,13 +893,13 @@ namespace word_counter {
 	namespace NodeIterator = LLDE::NodeIterator;
 	template<typename word_t>
 	struct WordCounter {
-		LLDE::OrdenedLinkedMap<word_t, size_t*>* list;
+		LLDE::OrdenedLinkedMap<word_t, size_t>* list;
 		size_t src_id;
 		size_t amount;
 	};
 	template<typename word_t>
 	void initialize(WordCounter<word_t>* state, LLDE::cmp_fn<word_t> compare, size_t amount) {
-		state->list = new LLDE::OrdenedLinkedMap<word_t, size_t*>;
+		state->list = new LLDE::OrdenedLinkedMap<word_t, size_t>;
 		LLDE::initalize_empty(state->list, compare);
 		state->amount = amount;
 		state->src_id = 0;
@@ -921,10 +921,15 @@ namespace word_counter {
 	template<typename word_t>
 	bool insert_word(WordCounter<word_t>* state, word_t* word) {
 		bool found;
-		LLDE::Node<word_t, size_t*>* element = LLDE::find_or_create(state->list, word, &found);
-		if(!found)
-			element->value = new size_t[state->amount];
-		element->value[state->src_id]++;
+		LLDE::Node<word_t, size_t>* element = LLDE::find_or_create(state->list, word, &found);
+		size_t* counter_map = element->value;
+		if(!found) {
+			counter_map = new size_t[state->amount];
+			for(size_t i = 0; i < state->amount; i++)
+				counter_map[i] = 0;
+			element->value = counter_map;
+		}
+		counter_map[state->src_id]++;
 		return found;
 	}
 	template<typename word_t>
@@ -934,9 +939,10 @@ namespace word_counter {
 	}
 	namespace test {
 		void simple_test(){
-			std::wstring* words[26];
+			std::wstring* pkeys[26];
 			WordCounter<std::wstring> counter;
-			const wchar_t* sources[] = {
+			NodeIterator::NodeIterator<std::wstring, size_t> state;
+			const wchar_t* keys[] = {
 				L"Hello", L"my", L"darling", L"friend.", // 4
 				L"would", L"you", L"like", L"to", L"hang", // 9
 				L"out", L"a", L"bit", L"more?", //13
@@ -944,31 +950,26 @@ namespace word_counter {
 				L"a", L"bit", L"more?", L"even", L"if", L"take", L"one", // 26
 				L"hour?"
 			};
+			initialize(&counter, 2);
 			for(size_t i = 0; i < 26; i++)
-				words[i] = new std::wstring(sources[i]);
+				pkeys[i] = new std::wstring(keys[i]);
 			for(size_t i = 0; i < 26; i++)
-				std::wcout << "word: "  << *words[i] << std::endl;
-			/*for(size_t i = 0; i < 12; i++)
-				insert_word(&counter, sources + i);
+				std::wcout << "word: "  << *pkeys[i] << std::endl;
+			for(size_t i = 0; i < 12; i++)
+				insert_word<std::wstring>(&counter, pkeys[i]);
 			next_source(&counter);
 			for(size_t i = 12; i < 26; i++)
-				insert_word(&counter, sources + i);*/
-			
-		}
-		/*void debug_wstring(WordCounter* counter){
-			NodeIterator::NodeIterator state;
-			NodeIterator::create(&state, counter->list->first);
-			size_t amount = counter->amount;
+				insert_word<std::wstring>(&counter, pkeys[i]);
+			NodeIterator::create(&state, counter.list->first);
 			while(NodeIterator::isalive(&state)) {
-				std::wcout << "key: " << *((std::wstring*) state.now->key) << " ";
-				//std::wcout << "adress=" << state->now << " ";
-				std::wcout << "value: ";
-				size_t* value = (size_t*) state.now->value;
-				for(size_t i = 0; i < amount; i++)
-					std::wcout << " " << value[i];
+				LLDE::Node<std::wstring, size_t>* now = NodeIterator::next(&state);
+				std::wcout << *now->key;
+				size_t* counter_map = now->value;
+				for(size_t i = 0; i < 2; i++)
+					std::wcout << " "  << counter_map[i];
 				std::wcout << std::endl;
 			}
-		}*/
+		}
 	}
 }
 void tests(){
@@ -986,7 +987,7 @@ void tests(){
 	ordened_linked_map::test::test_foc_int();
 	ordened_linked_map::test::test_psearch_wstring();
 	ordened_linked_map::test::test_foc_wstring();
-	//word_counter::test::simple_test();
+	word_counter::test::simple_test();
 }
 int main() {
 	//std::locale::global (std::locale (""));
