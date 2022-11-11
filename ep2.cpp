@@ -387,7 +387,7 @@ namespace ordened_linked_map {
 		into->gt = nullptr;
 	}
 	template<typename key_t, typename value_t>
-	SearchInterval<key_t, value_t>* partial_find(SearchInterval<key_t, value_t>* state, OrdenedLinkedMap<key_t, value_t>* list, void* key) {
+	SearchInterval<key_t, value_t>* partial_find(SearchInterval<key_t, value_t>* state, OrdenedLinkedMap<key_t, value_t>* list, key_t* key) {
 		/*
 		The target is the node the first node that key field is equal to "key"
 		A candidate is a node that could be the target. Exists up to one candidate, because the key fields's value of all nodes after the first candidate are greater than key, and, therefore, all subsequent nodes aren't candidates.
@@ -443,19 +443,14 @@ namespace ordened_linked_map {
 		return 1;
 	}
 	// the cmp_fn implementation for type "std::string"
-	int compare_string(const void* left, const void* right) {
-		std::string sleft = *((std::string*) left);
-		std::string sright = *((std::string*) right);
-		return sleft.compare(sright);
+	int compare_string(const std::string* left, const std::string* right) {
+		return left->compare(*right);
 	}
 	// the cmp_fn implementation for type "std::wstring"
-	int compare_wstring(const void* left, const void* right) {
-		//std::wstring sleft = *((std::wstring*) left);
-		//std::wstring sright = *((std::wstring*) right);
-		//return sleft.compare(sright);
-		std::wcout << "adress(left): " << left << std::endl;
-		std::wcout << "adress(right): " << right << std::endl;
-		return -1;
+	int compare_wstring(const std::wstring* left, const std::wstring* right) {
+		//std::wcout << "cmp_wstring: " << *left << std::endl;
+		//std::wcout << "cmp_wstring: " << *right << std::endl;
+		return left->compare(*right);
 	}
 	// initialize the node with defaults values 
 	template<typename key_t, typename value_t>
@@ -648,10 +643,10 @@ namespace ordened_linked_map {
 		void test_edge_insertion(bool debug);
 		void test_string_comparation();
 		void show_cmp_wstring(const std::wstring* left, const std::wstring* right);
-		template<typename key_t, typename value_t>
-		void printnode_int(const Node<key_t, value_t>* src);
-		template<typename key_t, typename value_t>
-		void printmap_int(NodeIterator::NodeIterator<key_t, value_t>* state);
+		template<typename value_t>
+		void printnode_int(const Node<int, value_t>* src);
+		template<typename value_t> 
+		void printmap_int(NodeIterator::NodeIterator<int, value_t>* state);
 		void test_check_edge(){
 			Node<int, int>* nodes [3];
 			int keys[] = {11, 12, 14};
@@ -693,18 +688,18 @@ namespace ordened_linked_map {
 			int left_values[] = {20, 82, -72, 37, 51, 45};
 			int right_keys[] = {0, 80, 59, 68, 31, 56};
 			int right_values[] = {0, 79, 53, 111, -7, 83};
-			const Node* nodes[12];
-			OrdenedLinkedMap list = {nullptr, nullptr, compare_int};
-			NodeIterator::NodeIterator mapper;
+			const Node<int, int>* nodes[12];
+			OrdenedLinkedMap<int, int> list = {nullptr, nullptr, compare_int};
+			NodeIterator::NodeIterator<int, int> mapper;
 			assert(check_edges(&list) == edge_nullability);
 			for(size_t i = 0; i < left_nodes; i++) {
-				Node* data = create_node(left_keys + i, left_values + i);
+				Node<int, int>* data = create_node(left_keys + i, left_values + i);
 				nodes[(left_nodes - 1) - i] = data;
 				appendLeft(&list, data);
 				assert(check_edges(&list) == edge_nullability);
 			}
 			for(size_t i = 0; i < right_nodes; i++) {
-				Node* data = create_node(right_keys + i, right_values + i);
+				Node<int, int>* data = create_node(right_keys + i, right_values + i);
 				nodes[left_nodes + i] = data;
 				appendRight(&list, data);
 				assert(check_edges(&list) == edge_nullability);
@@ -731,24 +726,32 @@ namespace ordened_linked_map {
 				show_cmp_wstring(text[i], text[i+1]);
 			}
 			std::wcout << std::endl;
+			for(size_t i = 0; i < 9; i++)
+				delete text[i];
 		}
-		
-		Node** test_partial_search(void* keys[3], OrdenedLinkedMap* list){
-			Node** nodes = new Node *[3];
+		template<typename key_t, typename value_t>
+		void clear_nodes(size_t amount, Node<key_t, value_t>** nodes) {
+			for(size_t i = 0; i < amount; i++)
+				delete nodes[i];
+			delete[] nodes;
+		}
+		template<typename key_t, typename value_t>
+		Node<key_t, value_t>** test_partial_search(key_t* keys[3], OrdenedLinkedMap<key_t, value_t>* list){
+			Node<key_t, value_t>** nodes = new Node<key_t, value_t> *[3];
 			for(size_t i = 0; i < 3; i++)
-				nodes[i] = create_node(keys + i, nullptr);
-			SearchInterval state;
-			assert(intv_empty(partial_find(&state, list, keys)));
+				nodes[i] = create_node<key_t, value_t>(keys[i], nullptr);
+			SearchInterval<key_t, value_t> state;
+			assert(intv_empty(partial_find(&state, list, keys[0])));
 			
 			appendLeft(list, nodes[2]);
 			
-			partial_find(&state, list, keys);
+			partial_find<key_t, value_t>(&state, list, keys[0]);
 			assert(state.lt == nullptr);
 			assert(state.eq == nullptr);
 			assert(state.gt == nodes[2]);
 			assert(!intv_empty(&state));
 			
-			partial_find(&state, list, keys + 2);
+			partial_find<key_t, value_t>(&state, list, keys[2]);
 			assert(state.lt == nullptr);
 			assert(state.eq == nodes[2]);
 			assert(state.gt == nullptr);
@@ -756,19 +759,19 @@ namespace ordened_linked_map {
 			
 			appendLeft(list, nodes[0]);
 			
-			partial_find(&state, list, keys);
+			partial_find(&state, list, keys[0]);
 			assert(state.lt == nullptr);
 			assert(state.eq == nodes[0]);
 			assert(state.gt == nodes[2]);
 			assert(!intv_empty(&state));
 			
-			partial_find(&state, list, keys + 1);
+			partial_find(&state, list, keys[1]);
 			assert(state.lt == nodes[0]);
 			assert(state.eq == nullptr);
 			assert(state.gt == nodes[2]);
 			assert(!intv_empty(&state));
 			
-			partial_find(&state, list, keys + 2);
+			partial_find(&state, list, keys[2]);
 			assert(state.lt == nodes[0]);
 			assert(state.eq == nodes[2]);
 			assert(state.gt == nullptr);
@@ -776,19 +779,19 @@ namespace ordened_linked_map {
 			
 			insertBetween(list, nodes[1], nodes[0], nodes[2]);
 			
-			partial_find(&state, list, keys);
+			partial_find(&state, list, keys[0]);
 			assert(state.lt == nullptr);
 			assert(state.eq == nodes[0]);
 			assert(state.gt == nodes[1]);
 			assert(!intv_empty(&state));
 			
-			partial_find(&state, list, keys + 1);
+			partial_find(&state, list, keys[1]);
 			assert(state.lt == nodes[0]);
 			assert(state.eq == nodes[1]);
 			assert(state.gt == nodes[2]);
 			assert(!intv_empty(&state));
 			
-			partial_find(&state, list, keys + 2);
+			partial_find(&state, list, keys[2]);
 			assert(state.lt == nodes[1]);
 			assert(state.eq == nodes[2]);
 			assert(state.gt == nullptr);
@@ -797,60 +800,49 @@ namespace ordened_linked_map {
 		}
 		void test_psearch_int() {
 			int keys[] = {-1, 27, 44};
-			void* source[3];
+			int* pkeys[3];
 			for(size_t i = 0; i < 3; i++)
-				source[i] = keys + i;
-			OrdenedLinkedMap list = {nullptr, nullptr, compare_int};
-			Node** nodes = test_partial_search(source, &list);
-			for(size_t i = 0; i < 3; i++)
-				delete nodes[i];
-			delete[] nodes;
+				pkeys[i] = keys + i;
+			OrdenedLinkedMap<int, void*> list = {nullptr, nullptr, compare_int};
+			clear_nodes(3, test_partial_search(pkeys, &list));
 		}
 		void test_psearch_wstring(){
-			std::wstring* keys[3];
-			void* source[3];
-			const wchar_t* sources[] = {
+			const wchar_t* keys[] = {
 				L"abc", L"abd", L"xyz",
 			};
+			std::wstring* pkeys[3];
 			for(size_t i = 0; i < 3; i++)
-				source[i] = keys[i] = new std::wstring(sources[i]);
-			OrdenedLinkedMap list = {nullptr, nullptr, compare_wstring};
-			for(size_t i = 0; i < 3; i++)
-				std::wcout << *((std::wstring*) source[i]) << std::endl;
-			//show_cmp_wstring((std::wstring*) source[0], (std::wstring*) source[1]);
-			//show_cmp_wstring((std::wstring*) source[1], (std::wstring*) source[2]);
-			Node** nodes = test_partial_search(source, &list);
-			
-			//NodeIterator::NodeIterator mapper;
-			//NodeIterator::create(mapper, &list);
+				pkeys[i] = new std::wstring(keys[i]);
+			OrdenedLinkedMap<std::wstring, void*> list = {nullptr, nullptr, compare_wstring};
+			clear_nodes(3, test_partial_search(pkeys, &list));
 		}
-		Node** test_find_or_create(void* source[4], OrdenedLinkedMap* list){
-			Node** nodes = new Node *[4];
-			Node* target;
+		template<typename key_t, typename value_t> 
+		Node<key_t, value_t>** test_find_or_create(key_t* source[4], OrdenedLinkedMap<key_t, value_t>* list){
+			Node<key_t, value_t>** nodes = new Node<key_t, value_t> *[4];
 			bool found;
-			nodes[0] = find_or_create(list, source, &found);
+			nodes[0] = find_or_create<key_t, value_t>(list, source[0], &found);
 			assert(!found);
 			assert(nodes[0]->value == nullptr);
 			
-			assert(find_or_create(list, source, &found) == nodes[0]);
+			assert(find_or_create(list, source[0], &found) == nodes[0]);
 			assert(found);
 			
-			nodes[3] = find_or_create(list, source + 3, &found);
+			nodes[3] = find_or_create(list, source[3], &found);
 			assert(!found);
 			
-			nodes[2] = find_or_create(list, source + 2, &found);
+			nodes[2] = find_or_create(list, source[2], &found);
 			assert(!found);
 			
-			assert(find_or_create(list, source + 3, &found) == nodes[3]);
+			assert(find_or_create(list, source[3], &found) == nodes[3]);
 			assert(found);
-			assert(find_or_create(list, source + 2, &found) == nodes[2]);
+			assert(find_or_create(list, source[2], &found) == nodes[2]);
 			assert(found);
 			
-			nodes[1] = find_or_create(list, source + 1, &found);
+			nodes[1] = find_or_create(list, source[1], &found);
 			assert(!found);
 			
 			for(size_t i = 0; i < 4; i++) {
-				assert(find_or_create(list, source + i, &found) == nodes[i]);
+				assert(find_or_create(list, source[i], &found) == nodes[i]);
 				assert(found);
 				assert(nodes[i] != nullptr);
 				assert(nodes[i]->value == nullptr);
@@ -859,46 +851,38 @@ namespace ordened_linked_map {
 		}
 		void test_foc_int(){
 			int keys[4] = {-1, 27, 44, 70};
-			void* source[4];
+			int* pkeys[4];
 			for(size_t i = 0; i < 4; i++)
-				source[i] = keys + i;
-			OrdenedLinkedMap list = {nullptr, nullptr, compare_int};
-			Node** nodes = test_find_or_create(source, &list);
-			for(size_t i = 0; i < 4; i++)
-				delete nodes[i];
-			delete[] nodes;
+				pkeys[i] = keys + i;
+			OrdenedLinkedMap<int, void*> list = {nullptr, nullptr, compare_int};
+			clear_nodes(4, test_find_or_create(pkeys, &list));
 		}
 		void test_foc_wstring(){
-			std::wstring* keys[4];
-			void* src[4];
-			const wchar_t* sources[] = {
+			const wchar_t* keys[] = {
 				L"Hello", L"my", L"darling", L"friend",
 			};
+			std::wstring* pkeys[4];
 			for(size_t i = 0; i < 4; i++)
-				keys[i] = new std::wstring(sources[i]);
-			for(size_t i = 0; i < 4; i++)
-				src[i] = keys[i];
-			OrdenedLinkedMap list = {nullptr, nullptr, compare_wstring};
-			Node** nodes = test_find_or_create(src, &list);
-			
-			//NodeIterator::NodeIterator mapper;
-			//NodeIterator::create(mapper, &list);
+				pkeys[i] = new std::wstring(keys[i]);
+			OrdenedLinkedMap<std::wstring, void*> list = {nullptr, nullptr, compare_wstring};
+			clear_nodes(4, test_find_or_create(pkeys, &list));
 		}
 		void show_cmp_wstring(const std::wstring* left, const std::wstring* right){
 			std::wcout << *left << L" ";
 			std::wcout << get_cmp_symbol(compare_wstring(left, right));
 			std::wcout << L" " << *right << std::endl;
 		}
-		void printnode_int(const Node* src){
-			std::wcout << "key=" << *((int*) src->key) << " ";
-			std::wcout << "adress=" << src << " ";
+		template<typename value_t> 
+		void printnode_int(const Node<int, value_t>* src){
+			std::wcout << "key=" << *src->key << " ";
+			std::wcout << "adress=" << (void*) src << " ";
 			#ifdef LINKMARK
-			std::wcout << "linkmark= " << " ";
+			std::wcout << "linkmark= " << src->linkmark;
 			#endif
-			std::wcout << "value=" << *((int*) src->value) << std::endl;
+			std::wcout << "value=" << *src->value << std::endl;
 		}
-		
-		void printmap_int(NodeIterator::NodeIterator* state) {
+		template<typename value_t> 
+		void printmap_int(NodeIterator::NodeIterator<int, value_t>* state) {
 			while(NodeIterator::isalive(state))
 				printnode_int(NodeIterator::next(state));
 		}
@@ -907,56 +891,51 @@ namespace ordened_linked_map {
 namespace word_counter {
 	namespace LLDE = ordened_linked_map;
 	namespace NodeIterator = LLDE::NodeIterator;
+	template<typename word_t>
 	struct WordCounter {
-		LLDE::OrdenedLinkedMap* list;
+		LLDE::OrdenedLinkedMap<word_t, size_t*>* list;
 		size_t src_id;
 		size_t amount;
 	};
-	void initialize(WordCounter* state, LLDE::cmp_fn compare, size_t amount) {
-		state->list = new LLDE::OrdenedLinkedMap;
+	template<typename word_t>
+	void initialize(WordCounter<word_t>* state, LLDE::cmp_fn<word_t> compare, size_t amount) {
+		state->list = new LLDE::OrdenedLinkedMap<word_t, size_t*>;
 		LLDE::initalize_empty(state->list, compare);
 		state->amount = amount;
 		state->src_id = 0;
 	}
-	void initialize_wstring(WordCounter* state, size_t amount) {
+	void initialize(WordCounter<std::wstring>* state, size_t amount) {
 		initialize(state, LLDE::compare_wstring, amount);
 	}
-	void initialize_string(WordCounter* state, size_t amount) {
+	void initialize(WordCounter<std::string>* state, size_t amount) {
 		initialize(state, LLDE::compare_string, amount);
 	}
-	void next_source(WordCounter* state) {
+	template<typename word_t>
+	void next_source(WordCounter<word_t>* state) {
 		state->src_id++;
 	}
-	bool isalive(WordCounter* state) {
+	template<typename word_t>
+	bool isalive(WordCounter<word_t>* state) {
 		return state->src_id < state->amount;
 	}
-	bool insert_word(WordCounter* state, void* word) {
+	template<typename word_t>
+	bool insert_word(WordCounter<word_t>* state, word_t* word) {
 		bool found;
-		LLDE::Node* element = LLDE::find_or_create(state->list, word, &found);
+		LLDE::Node<word_t, size_t*>* element = LLDE::find_or_create(state->list, word, &found);
 		if(!found)
 			element->value = new size_t[state->amount];
-		size_t* counter =  (size_t*) element->value;
-		counter[state->src_id]++;
+		element->value[state->src_id]++;
 		return found;
 	}
-	bool insert_word(WordCounter* state, std::wstring* word) {
-		return insert_word(state, (void*) word);
-	}
-	bool insert_word(WordCounter* state, std::string* word) {
-		return insert_word(state, (void*) word);
-	}
-	void insert_or_dealloc(WordCounter* state, std::wstring* word) {
-		if(insert_word(state, word))
-			delete word;
-	}
-	void insert_or_dealloc(WordCounter* state, std::string* word) {
+	template<typename word_t>
+	void insert_or_dealloc(WordCounter<word_t>* state, word_t* word) {
 		if(insert_word(state, word))
 			delete word;
 	}
 	namespace test {
 		void simple_test(){
 			std::wstring* words[26];
-			WordCounter counter;
+			WordCounter<std::wstring> counter;
 			const wchar_t* sources[] = {
 				L"Hello", L"my", L"darling", L"friend.", // 4
 				L"would", L"you", L"like", L"to", L"hang", // 9
@@ -968,7 +947,7 @@ namespace word_counter {
 			for(size_t i = 0; i < 26; i++)
 				words[i] = new std::wstring(sources[i]);
 			for(size_t i = 0; i < 26; i++)
-				std::wcout << *words[i] << std::endl;
+				std::wcout << "word: "  << *words[i] << std::endl;
 			/*for(size_t i = 0; i < 12; i++)
 				insert_word(&counter, sources + i);
 			next_source(&counter);
@@ -976,7 +955,7 @@ namespace word_counter {
 				insert_word(&counter, sources + i);*/
 			
 		}
-		void debug_wstring(WordCounter* counter){
+		/*void debug_wstring(WordCounter* counter){
 			NodeIterator::NodeIterator state;
 			NodeIterator::create(&state, counter->list->first);
 			size_t amount = counter->amount;
@@ -989,7 +968,7 @@ namespace word_counter {
 					std::wcout << " " << value[i];
 				std::wcout << std::endl;
 			}
-		}
+		}*/
 	}
 }
 void tests(){
@@ -999,14 +978,14 @@ void tests(){
 	filenames[1] = "test2.txt";
 	filenames[2] = "test3.txt";
 	filenames[3] = "test4.txt";
-	//LineReaderFile::test::test(filenames, 3);
-	//ordened_linked_map::test::test_string_comparation();
-	//ordened_linked_map::test::test_edge_insertion(true);
-	//ordened_linked_map::test::test_check_edge();
-	//ordened_linked_map::test::test_psearch_int();
-	//ordened_linked_map::test::test_foc_int();
+	LineReaderFile::test::test(filenames, 3);
+	ordened_linked_map::test::test_string_comparation();
+	ordened_linked_map::test::test_edge_insertion(true);
+	ordened_linked_map::test::test_check_edge();
+	ordened_linked_map::test::test_psearch_int();
+	ordened_linked_map::test::test_foc_int();
 	ordened_linked_map::test::test_psearch_wstring();
-	//ordened_linked_map::test::test_foc_wstring();
+	ordened_linked_map::test::test_foc_wstring();
 	//word_counter::test::simple_test();
 }
 int main() {
