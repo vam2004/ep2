@@ -950,16 +950,25 @@ namespace word_counter {
 				L"a", L"bit", L"more?", L"even", L"if", L"take", L"one", // 26
 				L"hour?"
 			};
-			initialize(&counter, 2);
-			for(size_t i = 0; i < 26; i++)
+			
+			for(size_t i = 0; i < 27; i++)
 				pkeys[i] = new std::wstring(keys[i]);
-			for(size_t i = 0; i < 26; i++)
-				std::wcout << "word: "  << *pkeys[i] << std::endl;
+			
+			std::wcout << "========== text ==========" << std::endl;
+			for(size_t i = 0; i < 12; i++)
+				std::wcout << *pkeys[i] << " ";
+			std::wcout << std::endl << "========== text ==========" << std::endl;
+			for(size_t i = 12; i < 27; i++)
+				std::wcout << *pkeys[i] << " ";
+			std::wcout << std::endl << "========== text ==========" << std::endl;
+			
+			initialize(&counter, 2);
 			for(size_t i = 0; i < 12; i++)
 				insert_word<std::wstring>(&counter, pkeys[i]);
 			next_source(&counter);
-			for(size_t i = 12; i < 26; i++)
+			for(size_t i = 12; i < 27; i++)
 				insert_word<std::wstring>(&counter, pkeys[i]);
+			
 			NodeIterator::create(&state, counter.list->first);
 			while(NodeIterator::isalive(&state)) {
 				LLDE::Node<std::wstring, size_t>* now = NodeIterator::next(&state);
@@ -979,14 +988,14 @@ void tests(){
 	filenames[1] = "test2.txt";
 	filenames[2] = "test3.txt";
 	filenames[3] = "test4.txt";
-	LineReaderFile::test::test(filenames, 3);
-	ordened_linked_map::test::test_string_comparation();
-	ordened_linked_map::test::test_edge_insertion(true);
-	ordened_linked_map::test::test_check_edge();
-	ordened_linked_map::test::test_psearch_int();
-	ordened_linked_map::test::test_foc_int();
-	ordened_linked_map::test::test_psearch_wstring();
-	ordened_linked_map::test::test_foc_wstring();
+	//LineReaderFile::test::test(filenames, 3);
+	//ordened_linked_map::test::test_string_comparation();
+	//ordened_linked_map::test::test_edge_insertion(true);
+	//ordened_linked_map::test::test_check_edge();
+	//ordened_linked_map::test::test_psearch_int();
+	//ordened_linked_map::test::test_foc_int();
+	//ordened_linked_map::test::test_psearch_wstring();
+	//ordened_linked_map::test::test_foc_wstring();
 	word_counter::test::simple_test();
 }
 int main() {
