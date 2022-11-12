@@ -687,6 +687,8 @@ namespace ordened_linked_map {
 			list.last->next = nullptr;
 			
 			assert(check_edges(&list) == edge_nullability);
+			for(size_t i = 0; i < 3; i++)
+				delete nodes[i];
 		}
 		
 		void test_edge_insertion(bool debug) {
@@ -723,6 +725,8 @@ namespace ordened_linked_map {
 			assert(soft_linkcheck::check_crosslink(&mapper) == nullptr);
 			//assert(check_leftlink(&list, nodes, nodes_amount) == nullptr);
 			//assert(check_rightlink(&list, nodes, nodes_amount) == nullptr);
+			for(size_t i = 0; i < 12; i++)
+				delete nodes[i];
 		}
 		
 		void test_string_comparation(){
@@ -824,6 +828,8 @@ namespace ordened_linked_map {
 				pkeys[i] = new std::wstring(keys[i]);
 			OrdenedLinkedMap<std::wstring, void*> list = {nullptr, nullptr, compare_wstring};
 			clear_nodes(3, test_partial_search(pkeys, &list));
+			for(size_t i = 0; i < 3; i++)
+				delete pkeys[i];
 		}
 		template<typename key_t, typename value_t> 
 		Node<key_t, value_t>** test_find_or_create(key_t* source[4], OrdenedLinkedMap<key_t, value_t>* list){
@@ -875,6 +881,8 @@ namespace ordened_linked_map {
 				pkeys[i] = new std::wstring(keys[i]);
 			OrdenedLinkedMap<std::wstring, void*> list = {nullptr, nullptr, compare_wstring};
 			clear_nodes(4, test_find_or_create(pkeys, &list));
+			for(size_t i = 0; i < 4; i++)
+				delete pkeys[i];
 		}
 		void show_cmp_wstring(const std::wstring* left, const std::wstring* right){
 			std::wcout << *left << L" ";
@@ -902,6 +910,30 @@ namespace stateview {
 	void system_pause();
 	void use_memory(size_t size);
 };
+/*namespace getword {
+	void getwchar_f(FILE* source, wchar_t* into) {
+		*into = getwc(source);
+	}
+	void getwchar_f(std::wistream* source, wchar_t* into) {
+		*source >> *into;
+	}
+	template<typename source_t>
+	int get_rawword(source_t source, wchar_t* buffer, size_t amount) {
+		size_t end = amount - 1;
+		size_t pos = 0;
+		while(pos < end) {
+			wchar_t tmp;
+			getwchar_f(source, &tmp);
+			if(tmp == WEOF) 
+				return 1;			
+			if(iswspace(tmp))
+				break;
+			buffer[pos++] = tmp;
+		}
+		buffer[pos] = '\0';
+		return 0;
+	}
+}*/
 namespace word_parse {
 	struct wparse {
 		std::wstring* buffer;
@@ -993,13 +1025,33 @@ namespace word_parse {
 			}
 			destroy_state(&state);
 		}
-		void echo_test() {
+		/*void echo_fixed() {
+			wparse state;
+			const int bsize = 8;
+			initialize(&state, bsize);
+			wchar_t buffer[bsize];
+			while(true) {
+				//std::wcout << ">> "; // print the prompt
+				if(getword::get_rawword(&std::wcin, buffer, bsize)) // read a line into buffer
+					break; // stop if fail bit or bad bit is setted
+				feed(&state, buffer, bsize); // feed the state machine
+				while(is_not_empty(&state)) {
+					wchar_t* word = read_word(&state); // take one word from state machine
+					if(word == nullptr)
+						break;
+					std::wcout << word << std::endl; // print the word
+					delete[] word; // free allocated space to word
+					ignore(&state); // ignore bad character from state machine
+				}
+			}
+		}*/
+		void echo_test(wchar_t end_in) {
 			wparse state;
 			initialize(&state, 256);
 			std::wstring buffer;
 			while(true) {
 				std::wcout << ">> "; // print the prompt
-				if(!std::getline(std::wcin, buffer)) // read a line into buffer
+				if(!std::getline(std::wcin, buffer, end_in)) // read a line into buffer
 					break; // stop if fail bit or bad bit is setted
 				buffer.push_back('\n'); // add a newline to the end
 				//std::wcout << buffer; // print the buffer back
@@ -1012,6 +1064,9 @@ namespace word_parse {
 				}
 				buffer.clear(); // clear the buffer
 			}
+		}
+		void echo_test() {
+			echo_test(L'\n');
 		}
 	}
 }
@@ -1104,7 +1159,12 @@ namespace word_counter {
 				for(size_t i = 0; i < 2; i++)
 					std::wcout << " "  << counter_map[i];
 				std::wcout << std::endl;
+				delete[] now->value;
+				delete now;
 			}
+			for(size_t i = 0; i < 27; i++)
+				delete pkeys[i];
+			delete counter.list;	
 		}
 	}
 }
@@ -1135,17 +1195,17 @@ void tests(){
 	const char* filenames[4] = { 
 		"test1.txt", "test2.txt", "test3.txt", "test4.txt"
 	};
-	//LineReaderFile::test::test(filenames, 3);
-	//ordened_linked_map::test::test_string_comparation();
-	//ordened_linked_map::test::test_edge_insertion(true);
-	//ordened_linked_map::test::test_check_edge();
-	//ordened_linked_map::test::test_psearch_int();
-	//ordened_linked_map::test::test_foc_int();
-	//ordened_linked_map::test::test_psearch_wstring();
-	//ordened_linked_map::test::test_foc_wstring();
-	//word_counter::test::simple_test();
+	LineReaderFile::test::test(filenames, 3);
+	ordened_linked_map::test::test_string_comparation();
+	ordened_linked_map::test::test_edge_insertion(true);
+	ordened_linked_map::test::test_check_edge();
+	ordened_linked_map::test::test_psearch_int();
+	ordened_linked_map::test::test_foc_int();
+	ordened_linked_map::test::test_psearch_wstring();
+	ordened_linked_map::test::test_foc_wstring();
+	word_counter::test::simple_test();
 	word_parse::test::simple_test();
-	word_parse::test::echo_test();
+	//word_parse::test::echo_test();
 }
 
 int main() {
