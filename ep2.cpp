@@ -914,7 +914,8 @@ namespace word_parse {
 		state->pos = 0;
 	}
 	void feed(wparse* state, const wchar_t* buffer, size_t amount) {
-		state->buffer->append(buffer, amount);
+		if(amount)
+			state->buffer->append(buffer, amount);
 	}
 	bool is_walphanum(wchar_t src) {
 		bool flag = !iswspace(src) && iswalnum(src);
@@ -983,16 +984,35 @@ namespace word_parse {
 			wparse state;
 			initialize(&state, 256);
 			feed(&state, message, wcslen(message));
-			std::wcout << message << std::endl;
+			std::wcout << message;
 			while(is_not_empty(&state)) {
 				wchar_t* word = read_word(&state);
-				std::wcout << ">> " << word << std::endl;
+				std::wcout << ": " << word << std::endl;
 				delete[] word;
 				ignore(&state);
 			}
 			destroy_state(&state);
 		}
-
+		void echo_test() {
+			wparse state;
+			initialize(&state, 256);
+			std::wstring buffer;
+			while(true) {
+				std::wcout << ">> "; // print the prompt
+				if(!std::getline(std::wcin, buffer)) // read a line into buffer
+					break; // stop if fail bit or bad bit is setted
+				buffer.push_back('\n'); // add a newline to the end
+				//std::wcout << buffer; // print the buffer back
+				feed(&state, buffer.c_str(), buffer.size()); // feed the state machine
+				while(is_not_empty(&state)) {
+					wchar_t* word = read_word(&state); // take one word from state machine
+					std::wcout << word << std::endl; // print the word
+					delete[] word; // free allocated space to word
+					ignore(&state); // ignore bad character from state machine
+				}
+				buffer.clear(); // clear the buffer
+			}
+		}
 	}
 }
 namespace word_counter {
@@ -1125,6 +1145,7 @@ void tests(){
 	//ordened_linked_map::test::test_foc_wstring();
 	//word_counter::test::simple_test();
 	word_parse::test::simple_test();
+	word_parse::test::echo_test();
 }
 
 int main() {
