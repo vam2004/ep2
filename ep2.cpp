@@ -1,9 +1,10 @@
 #include <iostream>
-#include <locale>
-#include <clocale>
+//#include <locale>
+#include <locale.h>
 #include <stdio.h>
 #include <assert.h>
 #include <string>
+#include <wchar.h>
 // encapuslate lineReader into a namespace
 namespace LineReaderFile {
 	struct LineReader {
@@ -490,21 +491,22 @@ namespace ordened_linked_map {
 		}
 		return element; // return the element which is properly poisitioned, but partially initialized
 	}
-	/* Check if both edge are valid:
-		- The left edge shall points to nullptr as left node (edge node nullability)
-		- The right edge shall points to nullptr as right node (edge node nullability)
-		- The left edge points to nullptr as right node if, and only if, the right edge points to nullptr (Double edge link nullability)
-		Returns non-zero on error. Otherwise, returns zero.
-	*/
 	namespace check_edge {
 		enum EdgeStatus {
-			edge_nullability,
-			edge_leftlink_error,
-			edge_rightlink_error,
-			edge_leftnode_error,
-			edge_rightnode_error,
-			unknown_edgestatus 
+			edge_nullability, // both edge link and node nullability was warranted
+			edge_leftlink_error, // the left link shall be null when right link is null
+			edge_rightlink_error,// the right link shall be null when left link is null
+			edge_leftnode_error, // the left node of left edge node isn't null
+			edge_rightnode_error, // the right node of right edge node isn't null
+			unknown_edgestatus // only the edge link was warranted
 		};
+		/*
+		Check the double edge node nullability:
+		- The left edge shall points to nullptr as left node (edge node nullability)
+		- The right edge shall points to nullptr as right node (edge node nullability)
+		[warnings]: 
+		(1) It is intented to be called after check_edgelink(). Otherwise, you shall warranty that two egdes links aren't nullptr
+		*/
 		template<typename key_t, typename value_t>
 		EdgeStatus check_edgenode(const OrdenedLinkedMap<key_t, value_t>* list) {
 			if(list->first->prev != nullptr) // error in left edge node
@@ -512,7 +514,11 @@ namespace ordened_linked_map {
 			if(list->last->next != nullptr) // error in right edge node
 				return EdgeStatus::edge_rightnode_error;
 			return EdgeStatus::edge_nullability; // sucess
-		}
+		}/*
+		Check the double edge link nullability:
+		- The left edge points to nullptr as right node if, and only if, the right edge points to nullptr (Double edge link nullability)
+		And returns a error constant if fails. Otherwise, returns EdgeStatus::edge_nullability if both edge link and node nullability are warranted, or EdgeStatus::unknown_edgestatus if the node nullability is unknown.
+		*/
 		template<typename key_t, typename value_t>
 		EdgeStatus check_edgelink(const OrdenedLinkedMap<key_t, value_t>* list) {
 			if(list->first == nullptr) {
@@ -524,12 +530,15 @@ namespace ordened_linked_map {
 				return EdgeStatus::edge_leftlink_error; // the left edge shall be nullptr
 			return EdgeStatus::unknown_edgestatus; // the edge links are sane. But the edge nodes status still not covered
 		}
+		/*
+		Atomically checks the edges links and edges nodes. Returns only EdgeStatus::edge_nullability on sucess. Otherwise returns the respective error code.
+		*/
 		template<typename key_t, typename value_t>
 		EdgeStatus check_edges(const OrdenedLinkedMap<key_t, value_t>* list) {
-			EdgeStatus status = check_edgelink(list);
-			if(status != EdgeStatus::unknown_edgestatus)
-				return status;
-			return check_edgenode(list);
+			EdgeStatus status = check_edgelink(list); // check edges links
+			if(status != EdgeStatus::unknown_edgestatus) // the list is empty (which has edge node warranty) or has link error
+				return status; // in both cases the test already ended
+			return check_edgenode(list); // finally checks the nodes (they are warrented to be not null)
 		}
 	}
 	
@@ -888,6 +897,104 @@ namespace ordened_linked_map {
 		}
 	}
 }
+namespace stateview {
+	template<typename word_t> void system_pause(word_t message);
+	void system_pause();
+	void use_memory(size_t size);
+};
+namespace word_parse {
+	struct wparse {
+		std::wstring* buffer;
+		size_t pos;
+	};
+	void initialize(wparse* state, size_t initial_size) {
+		state->buffer = new std::wstring;
+		if(initial_size)
+			state->buffer->reserve(initial_size);
+		state->pos = 0;
+	}
+	void feed(wparse* state, const wchar_t* buffer, size_t amount) {
+		state->buffer->append(buffer, amount);
+	}
+	bool is_walphanum(wchar_t src) {
+		bool flag = !iswspace(src) && iswalnum(src);
+		//std::wcout << "[ALPHANUM] src=" << src << " ";
+		//std::wcout << "flag=" << (flag ? "true" : "false") << std::endl;
+		return flag;
+	}
+	size_t exclude_inter(std::wstring buffer, size_t pos, size_t end) {
+		while(pos < end && !is_walphanum(buffer[pos]))
+			pos++;
+		return pos;
+	}
+	size_t include_inter(std::wstring buffer, size_t pos, size_t end) {
+		while(pos < end && is_walphanum(buffer[pos]))
+			pos++;
+		return pos;
+	}
+	size_t exclude_inter(std::wstring buffer, size_t pos) {
+		return exclude_inter(buffer, pos, buffer.size());
+	}
+	size_t include_inter(std::wstring buffer, size_t pos) {
+		return include_inter(buffer, pos, buffer.size());
+	}
+	void clear_buffer(wparse* state) {
+		size_t ipos = state->pos;
+		state->buffer->erase(0, ipos);
+		state->pos = 0;
+	}
+	void ignore(wparse* state) {
+		std::wstring buffer = *(state->buffer);
+		size_t bsize = buffer.size();
+		size_t bpos = state->pos;
+		size_t ignored = exclude_inter(buffer, bpos);
+		//std::wcout << "[IS_READY] bpos=" << bpos << " ";
+		//std::wcout << "bsize=" << bsize << " ";
+		//std::wcout << "state->pos=" << ignored << std::endl;
+		//std::wcout << "ignored: $";
+		state->pos = ignored;
+		clear_buffer(state);
+	}
+	bool is_not_empty(wparse* state) {
+		size_t buffer_size = state->buffer->size();
+		return state->pos < buffer_size;
+	}
+	wchar_t* read_word(wparse* state) {
+		const size_t ipos = state->pos;
+		const size_t bsize = state->buffer->size();
+		std::wstring buffer = *(state->buffer);
+		const size_t word_end = include_inter(buffer, ipos);
+		if(word_end >= bsize)
+			return nullptr;
+		const size_t word_size = word_end - ipos;
+		state->pos = word_end;
+		wchar_t* cbuffer = new wchar_t[word_size + 1];
+		for(size_t i = 0; i < word_size; i++)
+			cbuffer[i] = buffer[ipos + i];
+		cbuffer[word_size] = L'\0';
+		return cbuffer;
+	}
+	void destroy_state(wparse* state) {
+		delete state->buffer;
+	}
+	namespace test {
+		void simple_test() {
+			const wchar_t* message = L"Hello my old friend! It's almost 18:00 o'clock\n";
+			wparse state;
+			initialize(&state, 256);
+			feed(&state, message, wcslen(message));
+			std::wcout << message << std::endl;
+			while(is_not_empty(&state)) {
+				wchar_t* word = read_word(&state);
+				std::wcout << ">> " << word << std::endl;
+				delete[] word;
+				ignore(&state);
+			}
+			destroy_state(&state);
+		}
+
+	}
+}
 namespace word_counter {
 	namespace LLDE = ordened_linked_map;
 	namespace NodeIterator = LLDE::NodeIterator;
@@ -981,13 +1088,33 @@ namespace word_counter {
 		}
 	}
 }
+namespace stateview {
+	template<typename word_t>
+	void system_pause(word_t message)
+	{
+		std::wstring dummy;
+		std::wcout << message; // print pause message
+		std::wcin.ignore(1, '\n'); // ignore previuos new-line in stream 
+		std::getline(std::wcin, dummy); // await to user press enter and discard input
+	}
+	void system_pause() {
+		system_pause("Press enter to continue...");
+	}
+	// increase used memory
+	void use_memory(size_t size) {
+		if(size > 0) {
+			uint8_t* tmp = new uint8_t[size];
+			for(size_t i = 0; i < size; i++)
+				tmp[i] = i;
+			system_pause();
+			delete[] tmp;
+		}
+	}
+}
 void tests(){
-	const char* filenames[4];
-	std::wcout << L"";
-	filenames[0] = "test1.txt";
-	filenames[1] = "test2.txt";
-	filenames[2] = "test3.txt";
-	filenames[3] = "test4.txt";
+	const char* filenames[4] = { 
+		"test1.txt", "test2.txt", "test3.txt", "test4.txt"
+	};
 	//LineReaderFile::test::test(filenames, 3);
 	//ordened_linked_map::test::test_string_comparation();
 	//ordened_linked_map::test::test_edge_insertion(true);
@@ -996,11 +1123,14 @@ void tests(){
 	//ordened_linked_map::test::test_foc_int();
 	//ordened_linked_map::test::test_psearch_wstring();
 	//ordened_linked_map::test::test_foc_wstring();
-	word_counter::test::simple_test();
+	//word_counter::test::simple_test();
+	word_parse::test::simple_test();
 }
+
 int main() {
 	//std::locale::global (std::locale (""));
 	setlocale(LC_ALL, "");
+	std::wcout << L"";
 	tests();
 	return 0;
 }
