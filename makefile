@@ -1,5 +1,5 @@
 ep2: ep2.cpp makefile
-	g++ -o ep2 ep2.cpp
+	g++ -g -fsanitize=leak -o ep2 ep2.cpp
 ep2.cpp: /media/shared/ep2/ep2.cpp
 	cp /media/shared/ep2/ep2.cpp ep2.cpp
 makefile: /media/shared/ep2/makefile
