@@ -935,69 +935,91 @@ namespace stateview {
 	}
 }*/
 namespace word_parse {
+	// Look-ahead tokenizer
 	struct wparse {
-		std::wstring* buffer;
-		size_t pos;
+		std::wstring* buffer; // the quere used for storing the current head
+		size_t pos; // current position in the buffer
 	};
+	/*
+	Intializate the look-ahead tokenizer, and provide a initial size for its quere
+	*/
 	void initialize(wparse* state, size_t initial_size) {
-		state->buffer = new std::wstring;
-		if(initial_size)
-			state->buffer->reserve(initial_size);
-		state->pos = 0;
+		state->buffer = new std::wstring; // create the buffer in the heap
+		if(initial_size) // preallocate the buffer
+			state->buffer->reserve(initial_size); // reserving a greater space avoids reallocating
+		state->pos = 0; // no word was processed
 	}
+	/*
+	Copy the text into quere. If amount is zero, it does nothing.
+	[Warnings]:
+		(1) The function couldn't check if the source text ended with '\0' before maximum size, so you shall ensure that "amount" is lesser or equal to both maximum size of source text and the index of first '\0' if exists. 
+	*/
 	void feed(wparse* state, const wchar_t* buffer, size_t amount) {
 		if(amount)
 			state->buffer->append(buffer, amount);
 	}
+	// check if a wide character match the spec
 	bool is_walphanum(wchar_t src) {
 		bool flag = !iswspace(src) && iswalnum(src);
-		//std::wcout << "[ALPHANUM] src=" << src << " ";
-		//std::wcout << "flag=" << (flag ? "true" : "false") << std::endl;
 		return flag;
 	}
+	/* Calculates the position of the first character that matchs the spec, if all characters in buffer doesn't match the spec, return the "end". So all charater before that position are ignored in the quere
+	*/
 	size_t exclude_inter(std::wstring buffer, size_t pos, size_t end) {
 		while(pos < end && !is_walphanum(buffer[pos]))
 			pos++;
 		return pos;
 	}
+	/* Calculates the position of the first character that doesn't match the spec, if all characters in buffer matchs the spec, return the "end". So all charater before that position will be part of token
+	*/
 	size_t include_inter(std::wstring buffer, size_t pos, size_t end) {
 		while(pos < end && is_walphanum(buffer[pos]))
 			pos++;
 		return pos;
 	}
+	// same as exclude_inter(std::wstring, size_t, size_t), but the "end" is properly configured
 	size_t exclude_inter(std::wstring buffer, size_t pos) {
 		return exclude_inter(buffer, pos, buffer.size());
 	}
+	// same as include_inter(std::wstring, size_t, size_t), but the "end" is properly configured
 	size_t include_inter(std::wstring buffer, size_t pos) {
 		return include_inter(buffer, pos, buffer.size());
 	}
+	// remove all character from the quere that was already processed
 	void clear_buffer(wparse* state) {
-		size_t ipos = state->pos;
-		state->buffer->erase(0, ipos);
-		state->pos = 0;
+		size_t ipos = state->pos; // the first character that wasn't processed
+		if(ipos) { // indepotent: calling twice doesn't anything
+			state->buffer->erase(0, ipos); // clear all character until before the first character that wasn't processed, and moves all remaining character to begining
+			state->pos = 0; // update the position
+		}
 	}
+	/*
+	Clears all characters that was processed or doesn't match the spec. And set properly the "pos" to match the first valid character. Effectivilly removing garbage from the quere
+	*/
 	void ignore(wparse* state) {
-		std::wstring buffer = *(state->buffer);
-		size_t bsize = buffer.size();
-		size_t bpos = state->pos;
-		size_t ignored = exclude_inter(buffer, bpos);
-		//std::wcout << "[IS_READY] bpos=" << bpos << " ";
-		//std::wcout << "bsize=" << bsize << " ";
-		//std::wcout << "state->pos=" << ignored << std::endl;
-		//std::wcout << "ignored: $";
-		state->pos = ignored;
-		clear_buffer(state);
+		std::wstring buffer = *(state->buffer); // take a reference to the buffer
+		size_t bsize = buffer.size(); // get its size
+		size_t bpos = state->pos; // get actaul pos
+		size_t ignored = exclude_inter(buffer, bpos); // search first valid character if exists
+		state->pos = ignored; // advance the cursor to first valid character or to end if not exists
+		clear_buffer(state); // remove all characters before the first valid character
 	}
+	// checks if all character aren't processed
 	bool is_not_empty(wparse* state) {
 		size_t buffer_size = state->buffer->size();
 		return state->pos < buffer_size;
 	}
+	/*
+	Take a word from tokenizer if avaliable. Returns null otherwise.
+	[Warnings]: 
+		(1) All character that doesn't match the spec shall be ignored before calling it
+	*/
 	wchar_t* read_word(wparse* state) {
 		const size_t ipos = state->pos;
 		const size_t bsize = state->buffer->size();
 		std::wstring buffer = *(state->buffer);
 		const size_t word_end = include_inter(buffer, ipos);
-		if(word_end >= bsize)
+		if(word_end == ipos || word_end >= bsize)
 			return nullptr;
 		const size_t word_size = word_end - ipos;
 		state->pos = word_end;
@@ -1071,13 +1093,13 @@ namespace word_parse {
 	}
 }
 namespace word_counter {
-	namespace LLDE = ordened_linked_map;
+	namespace LLDE = ordened_linked_map; 
 	namespace NodeIterator = LLDE::NodeIterator;
 	template<typename word_t>
 	struct WordCounter {
-		LLDE::OrdenedLinkedMap<word_t, size_t>* list;
-		size_t src_id;
-		size_t amount;
+		LLDE::OrdenedLinkedMap<word_t, size_t>* list; // the double linked map
+		size_t src_id; // the actual index of counter
+		size_t amount; // the amount of files which will be processed
 	};
 	template<typename word_t>
 	void initialize(WordCounter<word_t>* state, LLDE::cmp_fn<word_t> compare, size_t amount) {
