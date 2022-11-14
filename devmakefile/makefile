@@ -1,16 +1,21 @@
-ep2: ep2.cpp makefile
-	g++ -g -fsanitize=leak -o ep2 ep2.cpp
+~/build/ep2/ep2: ep2.cpp 
+	g++ -g -fsanitize=leak -o ~/build/ep2/ep2 ep2.cpp
 ep2.cpp: /media/shared/ep2/ep2.cpp
-	cp /media/shared/ep2/ep2.cpp ep2.cpp
+	cp /media/shared/ep2/ep2.cpp ~/build/ep2/ep2.cpp
 makefile: /media/shared/ep2/devmakefile/makefile
-	cp /media/shared/ep2/devmakefile/makefile makefile
-run: ep2 
-	./ep2
-update:
-	cp -r /media/shared/ep2/* ~/build/ep2/
+	cp /media/shared/ep2/devmakefile/makefile ~/build/ep2/makefile
+copy_test:
+	cp /media/shared/ep2/tests/* ~/build/ep2/
+run: ~/build/ep2/ep2
+	~/build/ep2/ep2
+update: clean makefile ep2.cpp copy_test
 clean:
-	rm -f ~/build/ep2/ep2
+	rm -f ~/build/ep2/build/ep2
 	rm -f ~/build/ep2/ep2.cpp
 prune:
-	rm ~/build/ep2/*
+	rm -r ~/build/ep2/*
 	cp /media/shared/ep2/devmakefile/makefile ~/build/ep2/makefile
+mirror: prune
+	cp -r /media/shared/ep2/* ~/build/ep2/
+	echo "restore:" >> ~/build/ep2/makefile
+	echo "\tcp /media/shared/ep2/devmakefile/makefile ~/build/ep2/makefile" >> ~/build/ep2/makefile
