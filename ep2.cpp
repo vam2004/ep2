@@ -1273,7 +1273,7 @@ namespace word_counter {
 	}
 	namespace test {
 		void simple_test(){
-			std::wstring* pkeys[26];
+			std::wstring* pkeys[27];
 			WordCounter<std::wstring> counter;
 			const wchar_t* keys[] = {
 				L"Hello", L"my", L"darling", L"friend.", // 4
@@ -1493,3 +1493,10 @@ int main(int argc, char** argv) {
 	proxy_call(argc, (const char**)argv);
 	return 0;
 }
+/*
+The paradigm used was processual programming with a bit of generic programming. You probabilly will need a bit of time to scroll up to all boilerplate. There's five state machines and greater part of code is reserved for testing. If the probabilly of single failure per line is 0.1%, then it may have at least one failure. At least 40% of lines are pretty document, and is expected to have more than 10% of that are outdated. There's at least five state machine:
+ - LineReader: abstracts the command line argument as interator .
+ - OrdenedLinkedMap: a ordened double linked list with key-value fields.
+ - WordCounter: counts word per file using the OrdenedLinkedMap
+ - WordParse: a buffered tokenizer
+*/
