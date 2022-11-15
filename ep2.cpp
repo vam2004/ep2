@@ -1385,6 +1385,10 @@ inline void towlowerstr(wchar_t* source) {
 	for(size_t i = 0, size = wcslen(source); i < size; i++)
 		source[i] = towlower(source[i]);
 }
+inline void towlowerstr(std::wstring& source) {
+	for(size_t i = 0, size = source.size(); i < size; i++)
+		source[i] = towlower(source[i]);
+}
 
 namespace project {
 	namespace LR = line_reader;
@@ -1393,11 +1397,11 @@ namespace project {
 	using counter_t = WC::WordCounter<std::wstring>;
 	using parse_t = WP::wparse;
 	// prototypes
-	// read a raw word into buffer, returns true on sucess. Otherwise returns false
+	// read a raw word into buffer, returns true on sucess or at EOF. Otherwise returns false. Set ended with a bolean value indicating if reached EOF.
 	template<typename source_t>
-		bool read_rawword(source_t source, std::wstring* buffer);
-	/*template<typename source_t>
-	void process_file(counter_t* counter, source_t source);*/
+		bool read_rawword(source_t source, std::wstring* buffer, bool* ended);
+	template<typename source_t>
+	void process_file(counter_t* counter, source_t source);
 	template<typename source_t>
 		void main(const char** names, const size_t amount);
 	// entry point
@@ -1406,8 +1410,8 @@ namespace project {
 		LR::LineReader<source_t> state; // the state machine
 		counter_t counter;
 		WC::initialize(&counter, amount);
-		for(LR::create(&state, names, amount); LR::isgood(&state); LR::next_file(&state));
-			//process_file(&counter, state->source);
+		for(LR::create(&state, names, amount); LR::isgood(&state); LR::next_file(&state))
+			process_file(&counter, state.source);
 		LR::close_file(&state); // close the underlaying file, if it is opened.
 		if(LR::isalive(&state)) { // iteration is poisoned and is alive
 			std::wcout << "Invalid Input" << std::endl;
@@ -1417,28 +1421,35 @@ namespace project {
 		WC::destroy_counter(&counter);
 	}
 	template<>
-	bool read_rawword<std::wifstream*>(std::wifstream* source, std::wstring* buffer) {
-		return (*source >> *buffer).good();
+	bool read_rawword<std::wifstream*>(std::wifstream* source, std::wstring* buffer, bool* ended) {
+		*source >> *buffer;
+		*ended = source->eof();
+		return source->good() || *ended;
 	}
 	
-	/*template<typename source_t>
+	template<typename source_t>
 	void process_file(counter_t* counter, source_t source) {
 		std::wstring buffer;
 		parse_t parse;
 		WP::initialize(&parse);
-		while(read_rawword(source, &buffer)) {
+		bool ended = false;
+		while(read_rawword(source, &buffer, &ended)) {
+			buffer.push_back(' '); // sentinel
 			WP::feed(&parse, buffer); // insert a raw word (with bad characters)
 			while(WP::is_not_empty(&parse)) {
-				WP::ignore(&state); // ignore bad character from state machine
-				std::wstring* word = WP::read_word(&parse); // take one word (without bad characters)
-				if 
-				towlowerstr(word); // coverts to lowercase
-				std::wcout << word << std::endl; // print the word
-				delete[] word; // free allocated space to word
-				
+				WP::ignore(&parse); // ignore bad character from state machine
+				std::wstring* word = WP::read_word(&parse, nullptr); // take one word (without bad characters)
+				if (word == nullptr)
+					break;
+				towlowerstr(*word); // coverts to lowercase
+				std::wcout << *word << std::endl; // print the word
+				delete word; // free allocated space to word
 			}
+			if(ended)
+				break;
 		}
-	}*/
+		WP::destroy_state(&parse);
+	}
 	namespace tests {
 		void invalid_input(){
 			const char* filenames[4] = { 
@@ -1456,7 +1467,7 @@ int main() {
 	//std::locale::global (std::locale (""));
 	setlocale(LC_ALL, "");
 	std::wcout << L"";
-	tests();
-	//project::tests::simplest();
+	//tests();
+	project::tests::simplest();
 	return 0;
 }
