@@ -2,6 +2,7 @@
 //#include <locale>
 #include <locale.h>
 #include <stdio.h>
+#include <fstream>
 #include <assert.h>
 #include <string>
 #include <wchar.h>
@@ -54,28 +55,29 @@ namespace LineReaderFile {
 		return state->source != NULL; 
 	}
 	// implementation for std::ifstream
-	/*template<>
-	std::ifstream* create_source<std::ifstream*>(const char* filename) {
-		std::ifstream* source = new std::ifstream(filename);
-		return source;
-	}*/
-	/*template<>
-	void delete_source<std::ifstream*>(std::ifstream* source) {
+	template<>
+	std::wifstream* create_source<std::wifstream*>(const char* filename) {
+		return new std::wifstream(filename);;
+	}
+	template<>
+	void delete_source<std::wifstream*>(std::wifstream* source) {
 		source->close();
 		delete source;
-	}*/
+	}
 	template<> 
-	std::ifstream* null_source<std::ifstream*>() {
+	std::wifstream* null_source<std::wifstream*>() {
 		return nullptr;
-	}/*
+	}
 	template<>
-	bool check_source(const LineReader<std::ifstream*>* state) {
+	bool check_source(const LineReader<std::wifstream*>* state) {
+		if(state->source == nullptr)
+			return false;
 		if(state->source->bad()) // check if bad bit is set
 			return false; // the stream was poisoned
 		if(state->source->fail()) // check if failbit is set
 			return false; // the stream was poisoned
 		return true; // sucess
-	}*/
+	}
 	/*
 	Returns the pointer to name of actual file.
 	[Warnings]:
@@ -161,7 +163,11 @@ namespace LineReaderFile {
 			while((tmp = getwc(source)) != WEOF) 
 				std::wcout << tmp;
 		}
-		
+		template<> void print_file<std::wifstream*>(std::wifstream* source){
+			wchar_t buffer;
+			while(source->get(buffer)) 
+				std::wcout << buffer;
+		}
 		template<typename source_t>
 		void test(const char** names, const size_t amount){
 			LineReader<source_t> state; // the state machine
@@ -172,7 +178,7 @@ namespace LineReaderFile {
 			} // the iteration is not alive or is poisoned
 			std::wcout << std::endl << "@=========@ end @=========@" << std::endl;
 			close_file(&state); // close the underlaying file, if it is opened.
-			if(!check_source(&state))  // iteration is poisoned and is alive
+			if(isalive(&state))  // iteration is poisoned and is alive
 				std::wcout << "Invalid File: " << get_filename(&state) << std::endl << std::endl;
 		}
 		/*
@@ -1276,7 +1282,8 @@ void tests(){
 	const char* filenames[4] = { 
 		"test1.txt", "test2.txt", "test3.txt", "test4.txt"
 	};
-	LineReaderFile::test::test<FILE*>(filenames, 3);
+	//LineReaderFile::test::test<FILE*>(filenames, 3);
+	LineReaderFile::test::test<std::wifstream*>(filenames, 3);
 	//ordened_linked_map::test::test_string_comparation();
 	//ordened_linked_map::test::test_edge_insertion(true);
 	//ordened_linked_map::test::test_check_edge();
