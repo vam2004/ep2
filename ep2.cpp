@@ -1102,25 +1102,36 @@ namespace word_parse {
 		buffer->swap(temp);
 		return buffer;
 	}
+	
+	enum status_t {
+		read_sucess,
+		empty_word,
+		polling
+	};
 	/*
-	Take a non-empty word from tokenizer if avaliable. Returns null otherwise.
+	Take a non-empty word from tokenizer if avaliable. Set "status" with error code, unless that it is nullptr, and returns nullptr otherwise.
 	[Warnings]: 
 		(1) All character that doesn't match the spec shall be ignored before calling it
-	[Warranties]:
 	*/
-	std::wstring* read_word(wparse* state) {
+	
+	std::wstring* read_word(wparse* state, status_t* status) {
 		const size_t ipos = state->pos;
 		const size_t bsize = state->buffer->size();
 		std::wstring buffer = *(state->buffer);
 		const size_t word_end = include_inter(buffer, ipos);
-		if(word_end == ipos || word_end >= bsize)
+		status_t _err = status_t::read_sucess;
+		if (word_end == ipos) 
+			_err = status_t::empty_word;
+		else if(word_end >= bsize)
+			_err = status_t::polling;
+		if(status != nullptr)
+			*status = _err;
+		if(_err != status_t::read_sucess)
 			return nullptr;
-		//const size_t word_size = word_end - ipos;
 		state->pos = word_end;
 		std::wstring* cbuffer = copy_from(*state->buffer, ipos, word_end);
 		return cbuffer;
 	}
-	
 	void destroy_state(wparse* state) {
 		delete state->buffer;
 	}
@@ -1132,7 +1143,7 @@ namespace word_parse {
 			feed(&state, message, wcslen(message));
 			std::wcout << message;
 			while(is_not_empty(&state)) {
-				std::wstring* word = read_word(&state);
+				std::wstring* word = read_word(&state, nullptr);
 				std::wcout << ": " << *word << std::endl;
 				delete word;
 				ignore(&state);
@@ -1171,7 +1182,7 @@ namespace word_parse {
 				feed(&state, buffer.c_str(), buffer.size()); // feed the state machine
 				while(is_not_empty(&state)) {
 					ignore(&state); // ignore bad character from state machine
-					std::wstring* word = read_word(&state); // take one word from state machine
+					std::wstring* word = read_word(&state, nullptr); // take one word from state machine
 					if(word == nullptr)
 						break;
 					std::wcout << *word << std::endl; // print the word
@@ -1374,16 +1385,19 @@ inline void towlowerstr(wchar_t* source) {
 	for(size_t i = 0, size = wcslen(source); i < size; i++)
 		source[i] = towlower(source[i]);
 }
-/*
+
 namespace project {
 	namespace LR = line_reader;
 	namespace WC = word_counter;
 	namespace WP = word_parse;
-	using counter_t = WC::WordCounter<wchar_t>;
+	using counter_t = WC::WordCounter<std::wstring>;
 	using parse_t = WP::wparse;
 	// prototypes
+	// read a raw word into buffer, returns true on sucess. Otherwise returns false
 	template<typename source_t>
-	void process_file(counter_t* counter, source_t source);
+		bool read_rawword(source_t source, std::wstring* buffer);
+	/*template<typename source_t>
+	void process_file(counter_t* counter, source_t source);*/
 	template<typename source_t>
 		void main(const char** names, const size_t amount);
 	// entry point
@@ -1392,8 +1406,8 @@ namespace project {
 		LR::LineReader<source_t> state; // the state machine
 		counter_t counter;
 		WC::initialize(&counter, amount);
-		for(LR::create(&state, names, amount); LR::isgood(&state); LR::next_file(&state))
-			process_file(&counter, state->source);
+		for(LR::create(&state, names, amount); LR::isgood(&state); LR::next_file(&state));
+			//process_file(&counter, state->source);
 		LR::close_file(&state); // close the underlaying file, if it is opened.
 		if(LR::isalive(&state)) { // iteration is poisoned and is alive
 			std::wcout << "Invalid Input" << std::endl;
@@ -1403,26 +1417,46 @@ namespace project {
 		WC::destroy_counter(&counter);
 	}
 	template<>
-	void process_file<std::wifstream*>(counter_t* counter, std::wifstream* source) {
+	bool read_rawword<std::wifstream*>(std::wifstream* source, std::wstring* buffer) {
+		return (*source >> *buffer).good();
+	}
+	
+	/*template<typename source_t>
+	void process_file(counter_t* counter, source_t source) {
 		std::wstring buffer;
 		parse_t parse;
 		WP::initialize(&parse);
-		while(source >> buffer) {
+		while(read_rawword(source, &buffer)) {
 			WP::feed(&parse, buffer); // insert a raw word (with bad characters)
-			while(WP::is_not_empty(&state)) {
-				wchar_t* word = read_word(&state); // take one word (without bad characters)
+			while(WP::is_not_empty(&parse)) {
+				WP::ignore(&state); // ignore bad character from state machine
+				std::wstring* word = WP::read_word(&parse); // take one word (without bad characters)
+				if 
 				towlowerstr(word); // coverts to lowercase
 				std::wcout << word << std::endl; // print the word
 				delete[] word; // free allocated space to word
-				WP::ignore(&state); // ignore bad character from state machine
+				
 			}
 		}
+	}*/
+	namespace tests {
+		void invalid_input(){
+			const char* filenames[4] = { 
+				"test1.txt", "test2.txt", "test3.txt", "invalid.txt"
+			};
+			main<std::wifstream*>(filenames, 4);
+		}
+		void simplest() {
+			const char* filenames[1] = {"hello_world.txt"};
+			main<std::wifstream*>(filenames, 1);
+		}
 	}
-}*/
+}
 int main() {
 	//std::locale::global (std::locale (""));
 	setlocale(LC_ALL, "");
 	std::wcout << L"";
 	tests();
+	//project::tests::simplest();
 	return 0;
 }
