@@ -161,9 +161,12 @@ namespace line_reader {
 		template<typename source_t> void print_file(source_t source);
 		
 		template<> void print_file<FILE*>(FILE* source){
-			wchar_t tmp;
-			while((tmp = getwc(source)) != WEOF) 
+			while(true) {
+				wchar_t tmp = getwc(source);
+				if(feof(source))
+					break;
 				std::wcout << tmp;
+			}
 		}
 		template<> void print_file<std::wifstream*>(std::wifstream* source){
 			wchar_t buffer;
@@ -1073,7 +1076,6 @@ namespace word_parse {
 	*/
 	void ignore(wparse* state) {
 		std::wstring buffer = *(state->buffer); // take a reference to the buffer
-		size_t bsize = buffer.size(); // get its size
 		size_t bpos = state->pos; // get actaul pos
 		size_t ignored = exclude_inter(buffer, bpos); // search first valid character if exists
 		state->pos = ignored; // advance the cursor to first valid character or to end if not exists
@@ -1474,7 +1476,8 @@ void proxy_call(const int argc, const char** argv) {
 	if(raw_amount < 0)
 		return;
 	size_t amount = (size_t) raw_amount;
-	amount = amount < (argc - 2) ? amount : (argc - 2);
+	size_t provided = (size_t) (argc - 2);
+	amount = amount < provided ? amount : provided;
 	const char** filenames = argv + 2;
 	/*std::wcout << "amount: " << amount << std::endl;
 	for(size_t i = 0; i < amount; i++)
