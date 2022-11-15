@@ -7,52 +7,108 @@
 #include <wchar.h>
 // encapuslate lineReader into a namespace
 namespace LineReaderFile {
+	template<typename source_t>
 	struct LineReader {
 		const char** filenames; // the names of files to be readed
-		FILE* source;  // the state of actual file begin readed
+		source_t source;  // the state of actual file begin readed
 		size_t fileid;  // the index of actual file into filenames
 		size_t amount; // the number of files to be readed
 		bool alive;
 	};
 	// prototypes
-	const char* get_filename(const LineReader* state);
-	bool open_file(LineReader* state);
-	void close_file(LineReader* state);
-	void next_file(LineReader* state);
-	bool isgood(const LineReader* state);
-	bool isalive(const LineReader* state);
-	bool check_state(const LineReader* state);
-	void create(LineReader* state, const char** filenames, const size_t amount);
+	template<typename source_t>
+		const char* get_filename(const LineReader<source_t>* state);
+	template<typename source_t>
+		bool open_file(LineReader<source_t>* state);
+	template<typename source_t>
+		void close_file(LineReader<source_t>* state);
+	template<typename source_t>
+		void next_file(LineReader<source_t>* state);
+	template<typename source_t>
+		bool isgood(const LineReader<source_t>* state);
+	template<typename source_t>
+		bool isalive(const LineReader<source_t>* state);
+	template<typename source_t>
+		void create(LineReader<source_t>* state, const char** filenames, const size_t amount);
+	// traits
+	template<typename source_t> source_t create_source(const char* filename);
+	template<typename source_t> void delete_source(source_t source);
+	template<typename source_t> source_t null_source();
+	template<typename source_t>
+		bool check_source(const LineReader<source_t>* state);
+	// implementation for FILE*
+	template<>
+	FILE* create_source<FILE*>(const char* filename) {
+		return fopen(filename, "r");
+	}
+	template<>
+	void delete_source<FILE*>(FILE* source) {
+		fclose(source);
+	}
+	template<> 
+	FILE* null_source<FILE*>() {
+		return NULL;
+	}
+	template<>
+	bool check_source(const LineReader<FILE*>* state) {
+		return state->source != NULL; 
+	}
+	// implementation for std::ifstream
+	/*template<>
+	std::ifstream* create_source<std::ifstream*>(const char* filename) {
+		std::ifstream* source = new std::ifstream(filename);
+		return source;
+	}*/
+	/*template<>
+	void delete_source<std::ifstream*>(std::ifstream* source) {
+		source->close();
+		delete source;
+	}*/
+	template<> 
+	std::ifstream* null_source<std::ifstream*>() {
+		return nullptr;
+	}/*
+	template<>
+	bool check_source(const LineReader<std::ifstream*>* state) {
+		if(state->source->bad()) // check if bad bit is set
+			return false; // the stream was poisoned
+		if(state->source->fail()) // check if failbit is set
+			return false; // the stream was poisoned
+		return true; // sucess
+	}*/
 	/*
 	Returns the pointer to name of actual file.
 	[Warnings]:
 		(1) It shall be called only once the iterator is alive. Otherwise it could be undefined behavior.
 	*/
-	const char* get_filename(const LineReader* state) {
+	template<typename source_t>
+	const char* get_filename(const LineReader<source_t>* state) {
 		return state->filenames[state->fileid];
 	}
+	
 	/*
 	Tries the actual state's fully initialization. Returns a boolean value indicating that iteration still alive
 	[Warnings]:
 		(1) Inherits the warning (1) from get_filename().
 		(2) The "fileid", "amount" and "filenames" fields needs to be properly initialize before calling.
 	*/
-	
-	bool open_file(LineReader* state) {
+	template<typename source_t>
+	bool open_file(LineReader<source_t>* state) {
 		if(state->fileid >= state->amount)
 			return false; // stop interation
-		state->source = fopen(get_filename(state), "r"); // open the file in read mode
+		state->source = create_source<source_t>(get_filename(state)); // open the file in read mode
 		return true; // constinue iteration
 	}
 	/*
 	Finalizes the previuos state, closing the underlaying file (if wasn't closed).
 	[Warnings]:
-		(1) The "source" field should be always either a valid file or NULL.
+		(1) The "source" field should be always either a valid file or null_source.
 	*/
-	void close_file(LineReader* state) {
-		if(state->source != NULL) { // non-poisoned state
-			fclose(state->source); // close the underlaying file
-			state->source = NULL; // set to null to avoid reuse
+	template<typename source_t>
+	void close_file(LineReader<source_t>* state) {
+		if(state->source != null_source<source_t>()) { // non-poisoned state
+			delete_source(state->source); // close the underlaying file
+			state->source = null_source<source_t>(); // set to null to avoid reuse
 		}
 	}
 	/*
@@ -61,61 +117,62 @@ namespace LineReaderFile {
 		(1) Inherits warnings (1) and (2) from open_file()
 		(2) Inherits warning (1) from close_file()
 	*/
-	void next_file(LineReader* state) {
+	template<typename source_t>
+	void next_file(LineReader<source_t>* state) {
 		close_file(state); // close the previuos file (only after first iteration)
 		state->fileid++;
 		state->alive = open_file(state); // update "alive" field, which indicate if iteration is alive
 	}
 	/*
-	check if iteration is alive and the actual state was sucessful initialized
-	*/
-	bool isgood(const LineReader* state) {
-		return state->alive && check_state(state); // returns a boolean value indicating if the iteration is alive and the actual state was sucessful initialized.
-	}
-	/*
 	check if iteration is alive
 	*/
-	bool isalive(const LineReader* state) {
+	template<typename source_t>
+	bool isalive(const LineReader<source_t>* state) {
 		return state->alive;
 	}
 	/*
-	Check state of underlaying file, and returns:
-	- false, if the actual source file pointer is NULL
-	- true, otherwise.
+	check if iteration is alive and the actual state was sucessful initialized
 	*/
-	bool check_state(const LineReader* state) {
-		return state->source != NULL; 
+	template<typename source_t>
+	bool isgood(const LineReader<source_t>* state) {
+		return isalive(state) && check_source(state); // returns a boolean value indicating if the iteration is alive and the actual state was sucessful initialized.
 	}
 	/*
 	Properly initialize the state of iterator.
 	[warnings]:
 		(1) It will override all fields of state. So make sure for properly finalizing it, if the struct LineReader was reused. 
 	*/
-	void create(LineReader* state, const char** filenames, const size_t amount) {
+	template<typename source_t>
+	void create(LineReader<source_t>* state, const char** filenames, const size_t amount) {
 		state->fileid = 0; // its is "filenames" associted index, therefore starts with 0
 		state->amount = amount; // the size of "filenames"
 		state->filenames = filenames; 
-		state->source = NULL; // init as NULL (warning (1) from close_file())
+		state->source = null_source<source_t>(); // init as null_source (warning (1) from close_file())
 		state->alive = open_file(state); // update "alive" field, which indicate if iteration is alive
-	}
-	void read_word(LineReader* state, std::string& buffer) {
-		
 	}
 	// use a namespace to encapsulate the testing suit
 	namespace test {
-		void printFilename(const LineReader* state);
+		template<typename source_t> 
+			void printFilename(const LineReader<source_t>* state);
+		template<typename source_t> void print_file(source_t source);
+		
+		template<> void print_file<FILE*>(FILE* source){
+			wchar_t tmp;
+			while((tmp = getwc(source)) != WEOF) 
+				std::wcout << tmp;
+		}
+		
+		template<typename source_t>
 		void test(const char** names, const size_t amount){
-			LineReader state; // the state machine
+			LineReader<source_t> state; // the state machine
 			std::string line; // the buffer
 			for(create(&state, names, amount); isgood(&state); next_file(&state)) {
 				printFilename(&state);
-				wchar_t tmp;
-				while((tmp = getwc(state.source)) != WEOF) 
-					std::wcout << tmp;
+				print_file(state.source);
 			} // the iteration is not alive or is poisoned
 			std::wcout << std::endl << "@=========@ end @=========@" << std::endl;
 			close_file(&state); // close the underlaying file, if it is opened.
-			if(!check_state(&state))  // iteration is poisoned and is alive
+			if(!check_source(&state))  // iteration is poisoned and is alive
 				std::wcout << "Invalid File: " << get_filename(&state) << std::endl << std::endl;
 		}
 		/*
@@ -123,13 +180,15 @@ namespace LineReaderFile {
 		[warnings]:
 			(1) The "state" shall be alive (the iteration wasn't ended)
 		*/
-		void printFilename(const LineReader* state) {
+		template<typename source_t>
+		void printFilename(const LineReader<source_t>* state) {
 			std::wcout << L"========" << std::flush;
 			std::wcout << get_filename(state) << std::flush; 
 			std::wcout << L"========" << std::endl;
 		}
 	}
 }
+
 namespace ordened_linked_map {
 	/*
 	expeted a function that returns:
@@ -1217,16 +1276,16 @@ void tests(){
 	const char* filenames[4] = { 
 		"test1.txt", "test2.txt", "test3.txt", "test4.txt"
 	};
-	LineReaderFile::test::test(filenames, 3);
-	ordened_linked_map::test::test_string_comparation();
-	ordened_linked_map::test::test_edge_insertion(true);
-	ordened_linked_map::test::test_check_edge();
-	ordened_linked_map::test::test_psearch_int();
-	ordened_linked_map::test::test_foc_int();
-	ordened_linked_map::test::test_psearch_wstring();
-	ordened_linked_map::test::test_foc_wstring();
-	word_counter::test::simple_test();
-	word_parse::test::simple_test();
+	LineReaderFile::test::test<FILE*>(filenames, 3);
+	//ordened_linked_map::test::test_string_comparation();
+	//ordened_linked_map::test::test_edge_insertion(true);
+	//ordened_linked_map::test::test_check_edge();
+	//ordened_linked_map::test::test_psearch_int();
+	//ordened_linked_map::test::test_foc_int();
+	//ordened_linked_map::test::test_psearch_wstring();
+	//ordened_linked_map::test::test_foc_wstring();
+	//word_counter::test::simple_test();
+	//word_parse::test::simple_test();
 	//word_parse::test::echo_test();
 }
 
