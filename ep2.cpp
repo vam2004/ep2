@@ -1,3 +1,4 @@
+#define __STDC_WANT_LIB_EXT1_ 1
 #include <iostream>
 //#include <locale>
 #include <locale.h>
@@ -6,8 +7,9 @@
 #include <assert.h>
 #include <string>
 #include <wchar.h>
+#include <wctype.h>
 // encapuslate lineReader into a namespace
-namespace LineReaderFile {
+namespace line_reader {
 	template<typename source_t>
 	struct LineReader {
 		const char** filenames; // the names of files to be readed
@@ -171,7 +173,6 @@ namespace LineReaderFile {
 		template<typename source_t>
 		void test(const char** names, const size_t amount){
 			LineReader<source_t> state; // the state machine
-			std::string line; // the buffer
 			for(create(&state, names, amount); isgood(&state); next_file(&state)) {
 				printFilename(&state);
 				print_file(state.source);
@@ -1014,6 +1015,10 @@ namespace word_parse {
 			state->buffer->reserve(initial_size); // reserving a greater space avoids reallocating
 		state->pos = 0; // no word was processed
 	}
+	// Intializate the look-ahead tokenizer and prealloc the default size
+	void initialize(wparse* state) {
+		initialize(state, 0);
+	}
 	/*
 	Copy the text into quere. If amount is zero, it does nothing.
 	[Warnings]:
@@ -1022,6 +1027,11 @@ namespace word_parse {
 	void feed(wparse* state, const wchar_t* buffer, size_t amount) {
 		if(amount)
 			state->buffer->append(buffer, amount);
+	}
+	// Copy the text into quere.
+	void feed(wparse* state, const std::wstring buffer) {
+		*(state->buffer) += buffer;
+		std::wcout << "Buffer: " << *(state->buffer) << std::endl;
 	}
 	// check if a wide character match the spec
 	bool is_walphanum(wchar_t src) {
@@ -1074,26 +1084,43 @@ namespace word_parse {
 		size_t buffer_size = state->buffer->size();
 		return state->pos < buffer_size;
 	}
+	//Copies a substring and returns a new wstring allocated in heap.
+	std::wstring* copy_from(const std::wstring source, size_t ipos, size_t epos) {
+		// naive implementation
+		/*if(epos > source.size())
+			return nullptr;
+		const size_t size = ipos < epos ? epos - ipos : 0;
+		const wchar_t* sbuffer = source.c_str(); // inline the reference
+		std::wstring* buffer = new std::wstring; // allocate the wstring heap
+		buffer->reserve(size); // prelloc stace
+		for(size_t i = ipos; i < epos; i++)
+			buffer->push_back(sbuffer[i]);
+		return buffer;*/
+		// abstract implementation
+		std::wstring* buffer = new std::wstring;
+		std::wstring temp = source.substr(ipos, epos);
+		buffer->swap(temp);
+		return buffer;
+	}
 	/*
-	Take a word from tokenizer if avaliable. Returns null otherwise.
+	Take a non-empty word from tokenizer if avaliable. Returns null otherwise.
 	[Warnings]: 
 		(1) All character that doesn't match the spec shall be ignored before calling it
+	[Warranties]:
 	*/
-	wchar_t* read_word(wparse* state) {
+	std::wstring* read_word(wparse* state) {
 		const size_t ipos = state->pos;
 		const size_t bsize = state->buffer->size();
 		std::wstring buffer = *(state->buffer);
 		const size_t word_end = include_inter(buffer, ipos);
 		if(word_end == ipos || word_end >= bsize)
 			return nullptr;
-		const size_t word_size = word_end - ipos;
+		//const size_t word_size = word_end - ipos;
 		state->pos = word_end;
-		wchar_t* cbuffer = new wchar_t[word_size + 1];
-		for(size_t i = 0; i < word_size; i++)
-			cbuffer[i] = buffer[ipos + i];
-		cbuffer[word_size] = L'\0';
+		std::wstring* cbuffer = copy_from(*state->buffer, ipos, word_end);
 		return cbuffer;
 	}
+	
 	void destroy_state(wparse* state) {
 		delete state->buffer;
 	}
@@ -1105,9 +1132,9 @@ namespace word_parse {
 			feed(&state, message, wcslen(message));
 			std::wcout << message;
 			while(is_not_empty(&state)) {
-				wchar_t* word = read_word(&state);
-				std::wcout << ": " << word << std::endl;
-				delete[] word;
+				std::wstring* word = read_word(&state);
+				std::wcout << ": " << *word << std::endl;
+				delete word;
 				ignore(&state);
 			}
 			destroy_state(&state);
@@ -1140,17 +1167,19 @@ namespace word_parse {
 				std::wcout << ">> "; // print the prompt
 				if(!std::getline(std::wcin, buffer, end_in)) // read a line into buffer
 					break; // stop if fail bit or bad bit is setted
-				buffer.push_back('\n'); // add a newline to the end
-				//std::wcout << buffer; // print the buffer back
+				buffer.push_back(' '); // end the last word
 				feed(&state, buffer.c_str(), buffer.size()); // feed the state machine
 				while(is_not_empty(&state)) {
-					wchar_t* word = read_word(&state); // take one word from state machine
-					std::wcout << word << std::endl; // print the word
-					delete[] word; // free allocated space to word
 					ignore(&state); // ignore bad character from state machine
+					std::wstring* word = read_word(&state); // take one word from state machine
+					if(word == nullptr)
+						break;
+					std::wcout << *word << std::endl; // print the word
+					delete word; // free allocated space to word
 				}
 				buffer.clear(); // clear the buffer
 			}
+			destroy_state(&state);
 		}
 		void echo_test() {
 			echo_test(L'\n');
@@ -1206,11 +1235,35 @@ namespace word_counter {
 		if(insert_word(state, word))
 			delete word;
 	}
+	void print_counter(WordCounter<std::wstring>* counter) {
+		NodeIterator::NodeIterator<std::wstring, size_t> state;
+		NodeIterator::create(&state, counter->list->first);
+		while(NodeIterator::isalive(&state)) {
+			LLDE::Node<std::wstring, size_t>* now = NodeIterator::next(&state);
+			std::wcout << *now->key;
+			size_t* counter_map = now->value;
+			for(size_t i = 0; i < 2; i++)
+				std::wcout << " "  << counter_map[i];
+			std::wcout << std::endl;
+		}
+	}
+	template<typename word_t, bool keep_key = false>
+	void destroy_counter(WordCounter<word_t>* counter) {
+		NodeIterator::NodeIterator<word_t, size_t> state;
+		NodeIterator::create(&state, counter->list->first);
+		while(NodeIterator::isalive(&state)) {
+			LLDE::Node<word_t, size_t>* now = NodeIterator::next(&state);
+			if(!keep_key)
+				delete now->key;
+			delete[] now->value;
+			delete now;
+		}
+		delete counter->list;
+	}
 	namespace test {
 		void simple_test(){
 			std::wstring* pkeys[26];
 			WordCounter<std::wstring> counter;
-			NodeIterator::NodeIterator<std::wstring, size_t> state;
 			const wchar_t* keys[] = {
 				L"Hello", L"my", L"darling", L"friend.", // 4
 				L"would", L"you", L"like", L"to", L"hang", // 9
@@ -1233,25 +1286,40 @@ namespace word_counter {
 			
 			initialize(&counter, 2);
 			for(size_t i = 0; i < 12; i++)
-				insert_word<std::wstring>(&counter, pkeys[i]);
+				insert_word(&counter, pkeys[i]);
 			next_source(&counter);
 			for(size_t i = 12; i < 27; i++)
-				insert_word<std::wstring>(&counter, pkeys[i]);
+				insert_word(&counter, pkeys[i]);
 			
-			NodeIterator::create(&state, counter.list->first);
-			while(NodeIterator::isalive(&state)) {
-				LLDE::Node<std::wstring, size_t>* now = NodeIterator::next(&state);
-				std::wcout << *now->key;
-				size_t* counter_map = now->value;
-				for(size_t i = 0; i < 2; i++)
-					std::wcout << " "  << counter_map[i];
-				std::wcout << std::endl;
-				delete[] now->value;
-				delete now;
-			}
+			print_counter(&counter);
+			destroy_counter<std::wstring, true>(&counter);
+			
 			for(size_t i = 0; i < 27; i++)
 				delete pkeys[i];
-			delete counter.list;	
+		}
+		void test_destructor(){
+			std::wstring* pkeys[26];
+			WordCounter<std::wstring> counter;
+			const wchar_t* keys[] = {
+				L"Hello", L"my", L"darling", L"friend.", // 4
+				L"would", L"you", L"like", L"to", L"hang", // 9
+				L"out", L"a", L"bit", L"more?", //13
+				L"would", L"you", L"enjoy", L"to", L"be", L"out", //19
+				L"a", L"bit", L"more?", L"even", L"if", L"take", L"one", // 26
+				L"hour?"
+			};
+			
+			for(size_t i = 0; i < 27; i++)
+				pkeys[i] = new std::wstring(keys[i]);
+			
+			initialize(&counter, 2);
+			for(size_t i = 0; i < 12; i++)
+				insert_or_dealloc(&counter, pkeys[i]);
+			next_source(&counter);
+			for(size_t i = 12; i < 27; i++)
+				insert_or_dealloc(&counter, pkeys[i]);
+			
+			destroy_counter(&counter);
 		}
 	}
 }
@@ -1282,20 +1350,75 @@ void tests(){
 	const char* filenames[4] = { 
 		"test1.txt", "test2.txt", "test3.txt", "test4.txt"
 	};
-	//LineReaderFile::test::test<FILE*>(filenames, 3);
-	LineReaderFile::test::test<std::wifstream*>(filenames, 3);
-	//ordened_linked_map::test::test_string_comparation();
-	//ordened_linked_map::test::test_edge_insertion(true);
-	//ordened_linked_map::test::test_check_edge();
-	//ordened_linked_map::test::test_psearch_int();
-	//ordened_linked_map::test::test_foc_int();
-	//ordened_linked_map::test::test_psearch_wstring();
-	//ordened_linked_map::test::test_foc_wstring();
-	//word_counter::test::simple_test();
-	//word_parse::test::simple_test();
-	//word_parse::test::echo_test();
+	//line_reader::test::test<FILE*>(filenames, 3);
+	line_reader::test::test<std::wifstream*>(filenames, 3);
+	ordened_linked_map::test::test_string_comparation();
+	ordened_linked_map::test::test_edge_insertion(true);
+	ordened_linked_map::test::test_check_edge();
+	ordened_linked_map::test::test_psearch_int();
+	ordened_linked_map::test::test_foc_int();
+	ordened_linked_map::test::test_psearch_wstring();
+	ordened_linked_map::test::test_foc_wstring();
+	word_counter::test::simple_test();
+	word_counter::test::test_destructor();
+	word_parse::test::simple_test();
+	word_parse::test::echo_test();
 }
-
+/*
+	Converts a C wide null-terminated string to lower case.
+	[Warnings]:
+		(1) The source shall be null-terminated
+		(2) The source may be modified
+*/
+inline void towlowerstr(wchar_t* source) {
+	for(size_t i = 0, size = wcslen(source); i < size; i++)
+		source[i] = towlower(source[i]);
+}
+/*
+namespace project {
+	namespace LR = line_reader;
+	namespace WC = word_counter;
+	namespace WP = word_parse;
+	using counter_t = WC::WordCounter<wchar_t>;
+	using parse_t = WP::wparse;
+	// prototypes
+	template<typename source_t>
+	void process_file(counter_t* counter, source_t source);
+	template<typename source_t>
+		void main(const char** names, const size_t amount);
+	// entry point
+	template<typename source_t>
+	void main(const char** names, size_t amount){
+		LR::LineReader<source_t> state; // the state machine
+		counter_t counter;
+		WC::initialize(&counter, amount);
+		for(LR::create(&state, names, amount); LR::isgood(&state); LR::next_file(&state))
+			process_file(&counter, state->source);
+		LR::close_file(&state); // close the underlaying file, if it is opened.
+		if(LR::isalive(&state)) { // iteration is poisoned and is alive
+			std::wcout << "Invalid Input" << std::endl;
+		} else { // sucess
+			WC::print_counter(&counter);
+		}
+		WC::destroy_counter(&counter);
+	}
+	template<>
+	void process_file<std::wifstream*>(counter_t* counter, std::wifstream* source) {
+		std::wstring buffer;
+		parse_t parse;
+		WP::initialize(&parse);
+		while(source >> buffer) {
+			WP::feed(&parse, buffer); // insert a raw word (with bad characters)
+			while(WP::is_not_empty(&state)) {
+				wchar_t* word = read_word(&state); // take one word (without bad characters)
+				towlowerstr(word); // coverts to lowercase
+				std::wcout << word << std::endl; // print the word
+				delete[] word; // free allocated space to word
+				WP::ignore(&state); // ignore bad character from state machine
+			}
+		}
+	}
+}*/
 int main() {
 	//std::locale::global (std::locale (""));
 	setlocale(LC_ALL, "");
