@@ -1031,7 +1031,7 @@ namespace word_parse {
 	// Copy the text into quere.
 	void feed(wparse* state, const std::wstring buffer) {
 		*(state->buffer) += buffer;
-		std::wcout << "Buffer: " << *(state->buffer) << std::endl;
+		//std::wcout << "Buffer: " << *(state->buffer) << std::endl;
 	}
 	// check if a wide character match the spec
 	bool is_walphanum(wchar_t src) {
@@ -1253,7 +1253,7 @@ namespace word_counter {
 			LLDE::Node<std::wstring, size_t>* now = NodeIterator::next(&state);
 			std::wcout << *now->key;
 			size_t* counter_map = now->value;
-			for(size_t i = 0; i < 2; i++)
+			for(size_t i = 0, size = counter->src_id; i < size; i++)
 				std::wcout << " "  << counter_map[i];
 			std::wcout << std::endl;
 		}
@@ -1406,12 +1406,15 @@ namespace project {
 		void main(const char** names, const size_t amount);
 	// entry point
 	template<typename source_t>
-	void main(const char** names, size_t amount){
+	void entry_point(const char** names, size_t amount){
 		LR::LineReader<source_t> state; // the state machine
 		counter_t counter;
 		WC::initialize(&counter, amount);
-		for(LR::create(&state, names, amount); LR::isgood(&state); LR::next_file(&state))
+		for(LR::create(&state, names, amount); LR::isgood(&state); LR::next_file(&state)) {
 			process_file(&counter, state.source);
+			WC::next_source(&counter);
+		}
+			
 		LR::close_file(&state); // close the underlaying file, if it is opened.
 		if(LR::isalive(&state)) { // iteration is poisoned and is alive
 			std::wcout << "Invalid Input" << std::endl;
@@ -1442,8 +1445,8 @@ namespace project {
 				if (word == nullptr)
 					break;
 				towlowerstr(*word); // coverts to lowercase
-				std::wcout << *word << std::endl; // print the word
-				delete word; // free allocated space to word
+				//std::wcout << *word << std::endl; // print the word
+				WC::insert_or_dealloc(counter, word);
 			}
 			if(ended)
 				break;
@@ -1455,19 +1458,38 @@ namespace project {
 			const char* filenames[4] = { 
 				"test1.txt", "test2.txt", "test3.txt", "invalid.txt"
 			};
-			main<std::wifstream*>(filenames, 4);
+			entry_point<std::wifstream*>(filenames, 4);
 		}
 		void simplest() {
 			const char* filenames[1] = {"hello_world.txt"};
-			main<std::wifstream*>(filenames, 1);
+			entry_point<std::wifstream*>(filenames, 1);
 		}
 	}
 }
-int main() {
+// delegate the call to the main handler
+void proxy_call(const int argc, const char** argv) {
+	if (argc < 3)
+		return;
+	int raw_amount = atoi(argv[1]);
+	if(raw_amount < 0)
+		return;
+	size_t amount = (size_t) raw_amount;
+	amount = amount < (argc - 2) ? amount : (argc - 2);
+	const char** filenames = argv + 2;
+	/*std::wcout << "amount: " << amount << std::endl;
+	for(size_t i = 0; i < amount; i++)
+		std::wcout << filenames[i] << std::endl;
+	for(size_t i = 0; i < 27; i++)
+		std::wcout << L'-';
+	std::wcout << std::endl;*/
+	project::entry_point<std::wifstream*>(filenames, amount);
+}
+int main(int argc, char** argv) {
 	//std::locale::global (std::locale (""));
 	setlocale(LC_ALL, "");
 	std::wcout << L"";
 	//tests();
-	project::tests::simplest();
+	//project::tests::simplest();
+	proxy_call(argc, (const char**)argv);
 	return 0;
 }
