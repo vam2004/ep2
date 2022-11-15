@@ -1,0 +1,5 @@
+restore:
+	cp /media/shared/ep2/devmakefile/makefile ~/build/ep2/makefile
+repatch:
+	cp /media/shared/ep2/makefile ~/build/ep2/makefile
+	cat /media/shared/ep2/devmakefile/makefile.extra >> ~/build/ep2/makefile

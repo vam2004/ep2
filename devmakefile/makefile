@@ -17,5 +17,4 @@ prune:
 	cp /media/shared/ep2/devmakefile/makefile ~/build/ep2/makefile
 mirror: prune
 	cp -r /media/shared/ep2/* ~/build/ep2/
-	echo "restore:" >> ~/build/ep2/makefile
-	echo "\tcp /media/shared/ep2/devmakefile/makefile ~/build/ep2/makefile" >> ~/build/ep2/makefile
+	cat /media/shared/ep2/devmakefile/makefile.extra >> ~/build/ep2/makefile
