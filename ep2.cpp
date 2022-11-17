@@ -35,43 +35,49 @@ namespace line_reader {
 		void create(LineReader<source_t>* state, const char** filenames, const size_t amount);
 	// traits
 	template<typename source_t> source_t create_source(const char* filename);
-	template<typename source_t> void delete_source(source_t source);
 	template<typename source_t> source_t null_source();
-	template<typename source_t>
-		bool check_source(const LineReader<source_t>* state);
 	// implementation for FILE*
 	template<>
 	FILE* create_source<FILE*>(const char* filename) {
 		return fopen(filename, "r");
 	}
-	template<>
-	void delete_source<FILE*>(FILE* source) {
+	void delete_source(FILE* source) {
 		fclose(source);
 	}
-	template<> 
+	template<>
 	FILE* null_source<FILE*>() {
 		return NULL;
 	}
-	template<>
+	
 	bool check_source(const LineReader<FILE*>* state) {
 		return state->source != NULL; 
 	}
-	// implementation for std::ifstream
+	// implementation for std::wifstream*
 	template<>
 	std::wifstream* create_source<std::wifstream*>(const char* filename) {
 		return new std::wifstream(filename);;
 	}
 	template<>
-	void delete_source<std::wifstream*>(std::wifstream* source) {
-		source->close();
-		delete source;
-	}
-	template<> 
 	std::wifstream* null_source<std::wifstream*>() {
 		return nullptr;
 	}
+	// implementation for std::ifstream*
 	template<>
-	bool check_source(const LineReader<std::wifstream*>* state) {
+	std::ifstream* create_source<std::ifstream*>(const char* filename) {
+		return new std::ifstream(filename);;
+	}
+	template<>
+	std::ifstream* null_source<std::ifstream*>() {
+		return nullptr;
+	}
+	// shared implementation for std::basic_ifstream<charT>*
+	template<typename charT>
+	void delete_source(std::basic_ifstream<charT>* source) {
+		source->close();
+		delete source;
+	}
+	template<typename charT>
+	bool check_source(const LineReader<std::basic_ifstream<charT>*>* state) {
 		if(state->source == nullptr)
 			return false;
 		if(state->source->bad()) // check if bad bit is set
@@ -80,6 +86,7 @@ namespace line_reader {
 			return false; // the stream was poisoned
 		return true; // sucess
 	}
+	// end implementation
 	/*
 	Returns the pointer to name of actual file.
 	[Warnings]:
@@ -1034,7 +1041,7 @@ namespace word_parse {
 	// Copy the text into quere.
 	void feed(wparse* state, const std::wstring buffer) {
 		*(state->buffer) += buffer;
-		//std::wcout << "Buffer: " << *(state->buffer) << std::endl;
+		std::wcout << "Buffer: " << *(state->buffer) << std::endl;
 	}
 	// check if a wide character match the spec
 	bool is_walphanum(wchar_t src) {
