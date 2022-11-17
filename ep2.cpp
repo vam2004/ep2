@@ -165,9 +165,8 @@ namespace line_reader {
 	namespace test {
 		template<typename source_t> 
 			void printFilename(const LineReader<source_t>* state);
-		template<typename source_t> void print_file(source_t source);
 		
-		template<> void print_file<FILE*>(FILE* source){
+		void print_file(FILE* source){
 			while(true) {
 				wchar_t tmp = getwc(source);
 				if(feof(source))
@@ -175,10 +174,15 @@ namespace line_reader {
 				std::wcout << tmp;
 			}
 		}
-		template<> void print_file<std::wifstream*>(std::wifstream* source){
+		void print_file(std::wifstream* source){
 			wchar_t buffer;
 			while(source->get(buffer)) 
 				std::wcout << buffer;
+		}
+		void print_file(std::ifstream* source){
+			char buffer;
+			while(source->get(buffer)) 
+				std::cout << buffer;
 		}
 		template<typename source_t>
 		void test(const char** names, const size_t amount){
@@ -1012,21 +1016,26 @@ namespace stateview {
 }*/
 namespace word_parse {
 	// Look-ahead tokenizer
+	template<typename charT>
+		using buffer_t = std::basic_string<charT>;
+	template <typename charT>
 	struct wparse {
-		std::wstring* buffer; // the quere used for storing the current head
+		buffer_t<charT>* buffer; // the quere used for storing the current head
 		size_t pos; // current position in the buffer
 	};
 	/*
 	Intializate the look-ahead tokenizer, and provide a initial size for its quere
 	*/
-	void initialize(wparse* state, size_t initial_size) {
-		state->buffer = new std::wstring; // create the buffer in the heap
+	template<typename charT>
+	void initialize(wparse<charT>* state, size_t initial_size) {
+		state->buffer = new buffer_t<charT>; // create the buffer in the heap
 		if(initial_size) // preallocate the buffer
 			state->buffer->reserve(initial_size); // reserving a greater space avoids reallocating
 		state->pos = 0; // no word was processed
 	}
 	// Intializate the look-ahead tokenizer and prealloc the default size
-	void initialize(wparse* state) {
+	template<typename charT>
+	void initialize(wparse<charT>* state) {
 		initialize(state, 0);
 	}
 	/*
@@ -1034,44 +1043,56 @@ namespace word_parse {
 	[Warnings]:
 		(1) The function couldn't check if the source text ended with '\0' before maximum size, so you shall ensure that "amount" is lesser or equal to both maximum size of source text and the index of first '\0' if exists. 
 	*/
-	void feed(wparse* state, const wchar_t* buffer, size_t amount) {
+	template<typename charT>
+	void feed(wparse<charT>* state, const charT* buffer, size_t amount) {
 		if(amount)
 			state->buffer->append(buffer, amount);
 	}
 	// Copy the text into quere.
-	void feed(wparse* state, const std::wstring buffer) {
+	template<typename charT>
+	void feed(wparse<charT>* state, const buffer_t<charT> buffer) {
 		*(state->buffer) += buffer;
-		std::wcout << "Buffer: " << *(state->buffer) << std::endl;
+		//std::wcout << "Buffer: " << *(state->buffer) << std::endl;
 	}
 	// check if a wide character match the spec
-	bool is_walphanum(wchar_t src) {
+	bool is_gen_alphanum(wchar_t src) {
 		bool flag = !iswspace(src) && iswalnum(src);
+		return flag;
+	}
+	// check if a character match the spec
+	bool is_gen_alphanum(char src) {
+		bool flag = !isspace(src) && isalnum(src);
 		return flag;
 	}
 	/* Calculates the position of the first character that matchs the spec, if all characters in buffer doesn't match the spec, return the "end". So all charater before that position are ignored in the quere
 	*/
-	size_t exclude_inter(std::wstring buffer, size_t pos, size_t end) {
-		while(pos < end && !is_walphanum(buffer[pos]))
+	template<typename charT>
+	size_t exclude_inter(buffer_t<charT> buffer, size_t pos, size_t end) {
+		while(pos < end && !is_gen_alphanum(buffer[pos]))
 			pos++;
 		return pos;
 	}
 	/* Calculates the position of the first character that doesn't match the spec, if all characters in buffer matchs the spec, return the "end". So all charater before that position will be part of token
 	*/
-	size_t include_inter(std::wstring buffer, size_t pos, size_t end) {
-		while(pos < end && is_walphanum(buffer[pos]))
+	template<typename charT>
+	size_t include_inter(buffer_t<charT> buffer, size_t pos, size_t end) {
+		while(pos < end && is_gen_alphanum(buffer[pos]))
 			pos++;
 		return pos;
 	}
 	// same as exclude_inter(std::wstring, size_t, size_t), but the "end" is properly configured
-	size_t exclude_inter(std::wstring buffer, size_t pos) {
+	template<typename charT>
+	size_t exclude_inter(buffer_t<charT> buffer, size_t pos) {
 		return exclude_inter(buffer, pos, buffer.size());
 	}
 	// same as include_inter(std::wstring, size_t, size_t), but the "end" is properly configured
-	size_t include_inter(std::wstring buffer, size_t pos) {
+	template<typename charT>
+	size_t include_inter(buffer_t<charT> buffer, size_t pos) {
 		return include_inter(buffer, pos, buffer.size());
 	}
 	// remove all character from the quere that was already processed
-	void clear_buffer(wparse* state) {
+	template<typename charT>
+	void clear_buffer(wparse<charT>* state) {
 		size_t ipos = state->pos; // the first character that wasn't processed
 		if(ipos) { // indepotent: calling twice doesn't anything
 			state->buffer->erase(0, ipos); // clear all character until before the first character that wasn't processed, and moves all remaining character to begining
@@ -1081,20 +1102,23 @@ namespace word_parse {
 	/*
 	Clears all characters that was processed or doesn't match the spec. And set properly the "pos" to match the first valid character. Effectivilly removing garbage from the quere
 	*/
-	void ignore(wparse* state) {
-		std::wstring buffer = *(state->buffer); // take a reference to the buffer
+	template<typename charT>
+	void ignore(wparse<charT>* state) {
+		buffer_t<charT> buffer = *(state->buffer); // take a reference to the buffer
 		size_t bpos = state->pos; // get actaul pos
 		size_t ignored = exclude_inter(buffer, bpos); // search first valid character if exists
 		state->pos = ignored; // advance the cursor to first valid character or to end if not exists
 		clear_buffer(state); // remove all characters before the first valid character
 	}
 	// checks if all character aren't processed
-	bool is_not_empty(wparse* state) {
+	template<typename charT>
+	bool is_not_empty(const wparse<charT>* state) {
 		size_t buffer_size = state->buffer->size();
 		return state->pos < buffer_size;
 	}
 	//Copies a substring and returns a new wstring allocated in heap.
-	std::wstring* copy_from(const std::wstring source, size_t ipos, size_t epos) {
+	template<typename charT>
+	buffer_t<charT>* copy_from(const buffer_t<charT> source, size_t ipos, size_t epos) {
 		// naive implementation
 		/*if(epos > source.size())
 			return nullptr;
@@ -1106,8 +1130,8 @@ namespace word_parse {
 			buffer->push_back(sbuffer[i]);
 		return buffer;*/
 		// abstract implementation
-		std::wstring* buffer = new std::wstring;
-		std::wstring temp = source.substr(ipos, epos);
+		buffer_t<charT>* buffer = new buffer_t<charT>;
+		buffer_t<charT> temp = source.substr(ipos, epos);
 		buffer->swap(temp);
 		return buffer;
 	}
@@ -1122,12 +1146,7 @@ namespace word_parse {
 	[Warnings]: 
 		(1) All character that doesn't match the spec shall be ignored before calling it
 	*/
-	
-	std::wstring* read_word(wparse* state, status_t* status) {
-		const size_t ipos = state->pos;
-		const size_t bsize = state->buffer->size();
-		std::wstring buffer = *(state->buffer);
-		const size_t word_end = include_inter(buffer, ipos);
+	status_t analize_status(size_t word_end, size_t ipos, size_t bsize, status_t* status) {
 		status_t _err = status_t::read_sucess;
 		if (word_end == ipos) 
 			_err = status_t::empty_word;
@@ -1135,19 +1154,29 @@ namespace word_parse {
 			_err = status_t::polling;
 		if(status != nullptr)
 			*status = _err;
+		return _err;
+	}
+	template<typename charT>
+	buffer_t<charT>* read_word(wparse<charT>* state, status_t* status) {
+		const size_t ipos = state->pos;
+		const size_t bsize = state->buffer->size();
+		buffer_t<charT> buffer = *(state->buffer);
+		const size_t word_end = include_inter(buffer, ipos);
+		status_t _err = analize_status(word_end, ipos, bsize, status);
 		if(_err != status_t::read_sucess)
 			return nullptr;
 		state->pos = word_end;
-		std::wstring* cbuffer = copy_from(*state->buffer, ipos, word_end);
+		buffer_t<charT>* cbuffer = copy_from(*state->buffer, ipos, word_end);
 		return cbuffer;
 	}
-	void destroy_state(wparse* state) {
+	template<typename charT>
+	void destroy_state(wparse<charT>* state) {
 		delete state->buffer;
 	}
 	namespace test {
 		void simple_test() {
 			const wchar_t* message = L"Hello my old friend! It's almost 18:00 o'clock\n";
-			wparse state;
+			wparse<wchar_t> state;
 			initialize(&state, 256);
 			feed(&state, message, wcslen(message));
 			std::wcout << message;
@@ -1179,30 +1208,39 @@ namespace word_parse {
 				}
 			}
 		}*/
-		void echo_test(wchar_t end_in) {
-			wparse state;
+		template<typename charT>
+		void echo_test(charT end_in, std::basic_ostream<charT>& into, std::basic_istream<charT>& _from) {
+			wparse<charT> state;
 			initialize(&state, 256);
-			std::wstring buffer;
+			buffer_t<charT> buffer;
 			while(true) {
-				std::wcout << ">> "; // print the prompt
-				if(!std::getline(std::wcin, buffer, end_in)) // read a line into buffer
+				into << ">> "; // print the prompt
+				if(!std::getline(_from, buffer, end_in)) // read a line into buffer
 					break; // stop if fail bit or bad bit is setted
 				buffer.push_back(' '); // end the last word
 				feed(&state, buffer.c_str(), buffer.size()); // feed the state machine
 				while(is_not_empty(&state)) {
 					ignore(&state); // ignore bad character from state machine
-					std::wstring* word = read_word(&state, nullptr); // take one word from state machine
+					buffer_t<charT>* word = read_word(&state, nullptr); // take one word from state machine
 					if(word == nullptr)
 						break;
-					std::wcout << *word << std::endl; // print the word
+					into << *word << std::endl; // print the word
 					delete word; // free allocated space to word
 				}
 				buffer.clear(); // clear the buffer
 			}
 			destroy_state(&state);
 		}
-		void echo_test() {
-			echo_test(L'\n');
+		template<typename charT>
+			void echo_test();
+			
+		template<>
+		void echo_test<wchar_t>() {
+			echo_test(L'\n', std::wcout, std::wcin);
+		}
+		template<>
+		void echo_test<char>() {
+			echo_test('\n', std::cout, std::cin);
 		}
 	}
 }
@@ -1255,16 +1293,17 @@ namespace word_counter {
 		if(insert_word(state, word))
 			delete word;
 	}
-	void print_counter(WordCounter<std::wstring>* counter) {
+	template<typename charT>
+	void print_counter(WordCounter<std::basic_string<charT>>* counter, std::basic_ostream<charT>& into) {
 		NodeIterator::NodeIterator<std::wstring, size_t> state;
 		NodeIterator::create(&state, counter->list->first);
 		while(NodeIterator::isalive(&state)) {
 			LLDE::Node<std::wstring, size_t>* now = NodeIterator::next(&state);
-			std::wcout << *now->key;
+			into << *now->key;
 			size_t* counter_map = now->value;
 			for(size_t i = 0, size = counter->src_id; i < size; i++)
-				std::wcout << " "  << counter_map[i];
-			std::wcout << std::endl;
+				into << " "  << counter_map[i];
+			into << std::endl;
 		}
 	}
 	template<typename word_t, bool keep_key = false>
@@ -1311,7 +1350,7 @@ namespace word_counter {
 			for(size_t i = 12; i < 27; i++)
 				insert_word(&counter, pkeys[i]);
 			
-			print_counter(&counter);
+			print_counter(&counter, std::wcout);
 			destroy_counter<std::wstring, true>(&counter);
 			
 			for(size_t i = 0; i < 27; i++)
@@ -1367,22 +1406,23 @@ namespace stateview {
 	}
 }
 void tests(){
-	const char* filenames[4] = { 
-		"test1.txt", "test2.txt", "test3.txt", "test4.txt"
+	const char* filenames[3] = { 
+		"test1.txt", "test2.txt", "invalid.txt"
 	};
 	//line_reader::test::test<FILE*>(filenames, 3);
-	line_reader::test::test<std::wifstream*>(filenames, 3);
-	ordened_linked_map::test::test_string_comparation();
+	//line_reader::test::test<std::wifstream*>(filenames, 3);
+	//line_reader::test::test<std::ifstream*>(filenames, 3);
+	/*ordened_linked_map::test::test_string_comparation();
 	ordened_linked_map::test::test_edge_insertion(true);
 	ordened_linked_map::test::test_check_edge();
 	ordened_linked_map::test::test_psearch_int();
 	ordened_linked_map::test::test_foc_int();
 	ordened_linked_map::test::test_psearch_wstring();
-	ordened_linked_map::test::test_foc_wstring();
-	word_counter::test::simple_test();
-	word_counter::test::test_destructor();
-	word_parse::test::simple_test();
-	word_parse::test::echo_test();
+	ordened_linked_map::test::test_foc_wstring();*/
+	/*word_counter::test::simple_test();
+	word_counter::test::test_destructor();*/
+	//word_parse::test::simple_test();
+	word_parse::test::echo_test<wchar_t>();
 }
 /*
 	Converts a C wide null-terminated string to lower case.
@@ -1404,7 +1444,7 @@ namespace project {
 	namespace WC = word_counter;
 	namespace WP = word_parse;
 	using counter_t = WC::WordCounter<std::wstring>;
-	using parse_t = WP::wparse;
+	using parse_t = WP::wparse<wchar_t>;
 	// prototypes
 	// read a raw word into buffer, returns true on sucess or at EOF. Otherwise returns false. Set ended with a bolean value indicating if reached EOF.
 	template<typename source_t>
@@ -1428,7 +1468,7 @@ namespace project {
 		if(LR::isalive(&state)) { // iteration is poisoned and is alive
 			std::wcout << "Invalid Input" << std::endl;
 		} else { // sucess
-			WC::print_counter(&counter);
+			WC::print_counter(&counter, std::wcout);
 		}
 		WC::destroy_counter(&counter);
 	}
