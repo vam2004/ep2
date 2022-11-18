@@ -1,4 +1,4 @@
-#define __STDC_WANT_LIB_EXT1_ 1
+//#define __STDC_WANT_LIB_EXT1_ 1
 #include <iostream>
 #include <locale>
 #include <stdio.h>
@@ -8,6 +8,13 @@
 #include <wchar.h>
 #include <wctype.h>
 #include <codecvt>
+//debugging flags
+#ifdef __DEBUG_INSERTIONS__
+	#define __SHOW_COMPARATIONS__
+	#define __SHOW_INSERTIONS__
+	#define __SHOW_IF_FOUND_INSERTION__
+	#define __SHOW_SEARCHING__
+#endif
 // encapuslate lineReader into a namespace
 namespace line_reader {
 	template<typename source_t>
@@ -467,6 +474,14 @@ namespace ordened_linked_map {
 		into->eq = nullptr;
 		into->gt = nullptr;
 	}
+	template<typename key_t, typename value_t> 
+	void debug_node(Node<key_t, value_t>* source, std::wostream& output){
+		if(source == nullptr)
+			output << "nullptr";
+		else 
+			output << *source->key;
+	}
+	
 	template<typename key_t, typename value_t>
 	SearchInterval<key_t, value_t>* partial_find(SearchInterval<key_t, value_t>* state, OrdenedLinkedMap<key_t, value_t>* list, key_t* key) {
 		/*
@@ -480,28 +495,45 @@ namespace ordened_linked_map {
 		int cmp = 0; // Comparation flag. Non-zero means that the candidate was found. 
 		while(now != nullptr) {
 			/*
-			compare(now->key, key) + 1 == 0 --> now->key < key
+			compare(now->key, key) + 1 <= 0 --> now->key < key
 			compare(now->key, key) + 1 == 1 --> now->key == key
-			compare(now->key, key) + 1 == 2 --> now->key > key
+			compare(now->key, key) + 1 >= 2 --> now->key > key
 			*/
 			cmp = compare(now->key, key) + 1; // update the comparation flag
-			if(cmp != 0) // now->key < key
+			if(cmp > 0) // now->key >= key
 				break;
 			// now->key < key
 			pre = now; // update the last node
 			now = now->next; // advance to next node
 		}
+		
+		#ifdef __SHOW_SEARCHING__
+		std::wcout << "compare: " << cmp << std::endl;
+		std::wcout << "lt: ";
+		debug_node(pre, std::wcout);
+		std::wcout << std::endl;
+		#endif
+		
 		state->lt = pre; // The variable "pre" contains the last node that is lesser than the target, or nullptr if not exists.
 		// "Now" will be nullptr if, and only if, "cmp" is not equal to zero.
-		if(cmp == 0) // there isn't a node is greater or equal to target.
+		if(cmp <= 0) // there isn't a node is greater or equal to target.
 			return state;
 		// "now" is the candidate
-		if(cmp == 2) { // target was not found
-			state->gt = now; // the candidate is the first node that key is greater than target
-		} else { // target was found
+		if(cmp == 1) { // target was found
 			state->eq = now; // the candidate is the target
 			state->gt = now->next; // the greater neightbor is the first node that key is greater than target
+		} else { // target was not found
+			state->gt = now; // the candidate is the first node that key is greater than target
 		}
+		#ifdef __SHOW_SEARCHING__
+		std::wcout << "eq: ";
+		debug_node(state->eq, std::wcout);
+		std::wcout << std::endl;
+		
+		std::wcout << "gt: ";
+		debug_node(state->gt, std::wcout);
+		std::wcout << std::endl;
+		#endif
 		return state;
 	}
 	/*
@@ -531,7 +563,13 @@ namespace ordened_linked_map {
 	int compare_wstring(const std::wstring* left, const std::wstring* right) {
 		//std::wcout << "cmp_wstring: " << *left << std::endl;
 		//std::wcout << "cmp_wstring: " << *right << std::endl;
-		return left->compare(*right);
+		int cmp_result = left->compare(*right);
+		#ifdef __SHOW_COMPARATIONS__
+		std::wcout << "\t[" << cmp_result << "] "<< *left << L" ";
+		std::wcout << get_cmp_symbol(cmp_result);
+		std::wcout << L" " << *right << std::endl;
+		#endif
+		return cmp_result;
 	}
 	// initialize the node with defaults values 
 	template<typename key_t, typename value_t>
@@ -1278,6 +1316,9 @@ namespace word_counter {
 	bool insert_word(WordCounter<word_t>* state, word_t* word) {
 		bool found;
 		LLDE::Node<word_t, size_t>* element = LLDE::find_or_create(state->list, word, &found);
+		#ifdef __SHOW_IF_FOUND_INSERTION__
+		std::wcout << (found ? "" : "not ") << "found: " << *word << std::endl;
+		#endif
 		size_t* counter_map = element->value;
 		if(!found) {
 			counter_map = new size_t[state->amount];
@@ -1290,8 +1331,16 @@ namespace word_counter {
 	}
 	template<typename word_t>
 	void insert_or_dealloc(WordCounter<word_t>* state, word_t* word) {
-		if(insert_word(state, word))
+		#ifdef __SHOW_INSERTIONS__
+		std::wcout << "@inserting: " << *word << std::endl;
+		#endif
+		if(insert_word(state, word)) {
+			#ifdef __SHOW_INSERTIONS__
+			std::wcout << "#already in counter: " << *word << std::endl;
+			#endif
 			delete word;
+		}
+			
 	}
 	template<typename charT>
 	void print_counter(WordCounter<std::basic_string<charT>>* counter, std::basic_ostream<charT>& into) {
