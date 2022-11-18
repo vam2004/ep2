@@ -2,10 +2,6 @@
 #include <locale>
 #include <string>
 #include <codecvt>
-#include <iostream>
-#include <locale>
-#include <string>
-#include <codecvt>
 /*
 This program is a minimal sample of converting utf8 to wchar_t.
 References:
@@ -27,13 +23,15 @@ void conv_word(const source_t source, std::basic_string<charT>* into) {
 	std::basic_string<charT> converted = converter.from_bytes(source); // convert the source and store result into stack
 	into->swap(converted); // move the result from stack to "into"
 }
-void read_word(std::istream& source, std::wstring* obuffer) {
+bool read_word(std::istream& source, std::wstring* obuffer) {
 	std::string ibuffer; // a temporary buffer for input
-	source >> ibuffer; // read utf8 string
+	if(!(source >> ibuffer)) // read utf8 string
+		return false; // error when reading
 	#ifdef SHOW_CODEPOINTS
 	print_utf8_code(ibuffer.c_str(), std::wcout); // print code points
 	#endif
 	conv_word(ibuffer, obuffer); // convert the input and put into "obuffer" 
+	return true; // sucess
 }
 void simple_test(){
 	const char* source_word = "d\xc3\xa9j\xc3\xa0 vu"; // "dèjá vu" encoded in utf8
@@ -47,10 +45,9 @@ void simple_test(){
 void echo_test () {
 	std::cin.imbue( std::locale("") ); // set the locale of cin to actual locale
 	std::wstring readed;
-	do {
-		read_word(std::cin, &readed); // take a std::wstring from cin
+	while(read_word(std::cin, &readed)) {
 		std::wcout << readed << std::endl; // print result
-	} while (readed != L"$");
+	}
 }
 int main(){
 	std::locale::global (std::locale (""));
