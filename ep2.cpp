@@ -218,11 +218,16 @@ namespace line_reader {
 }
 
 namespace ordened_linked_map {
+	
 	/*
+	
 	expeted a function that returns:
-		-1, if the left element is lesser than right element
-		0, if the left element is equal to right element
-		1, if the left element is greater than right
+		negative number, if the left element is lesser than right element
+		zero, if the left element is equal to right element
+		positive number, if the left element is greater than right
+	Likely to be implemented: 
+		- https://cplusplus.com/reference/string/string/compare/
+		- 
 	*/
 	template<typename key_t>
 	using cmp_fn = int (*)(const key_t*, const key_t*);
