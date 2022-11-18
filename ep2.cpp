@@ -1,13 +1,13 @@
 #define __STDC_WANT_LIB_EXT1_ 1
 #include <iostream>
-//#include <locale>
-#include <locale.h>
+#include <locale>
 #include <stdio.h>
 #include <fstream>
 #include <assert.h>
 #include <string>
 #include <wchar.h>
 #include <wctype.h>
+#include <codecvt>
 // encapuslate lineReader into a namespace
 namespace line_reader {
 	template<typename source_t>
@@ -1535,8 +1535,11 @@ void proxy_call(const int argc, const char** argv) {
 	project::entry_point<std::wifstream*>(filenames, amount);
 }
 int main(int argc, char** argv) {
-	//std::locale::global (std::locale (""));
-	setlocale(LC_ALL, "");
+	std::ios_base::sync_with_stdio(false);
+	std::locale::global (std::locale (""));
+	std::wcin.imbue( std::locale("") );
+	std::wcout.imbue( std::locale("") );
+	//setlocale(LC_ALL, "");
 	std::wcout << L"";
 	//tests();
 	//project::tests::simplest();
