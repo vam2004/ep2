@@ -10,7 +10,7 @@ run: ~/build/ep2/ep2
 	~/build/ep2/ep2
 update: clean makefile ep2.cpp copy_test
 clean:
-	rm -f ~/build/ep2/build/ep2
+	rm -f ~/build/ep2/ep2
 	rm -f ~/build/ep2/ep2.cpp
 prune:
 	rm -r ~/build/ep2/*
