@@ -1459,23 +1459,38 @@ namespace stateview {
 		}
 	}
 }
-void tests(){
-	const char* filenames[3] = { 
-		"test1.txt", "test2.txt", "invalid.txt"
-	};
-	//line_reader::test::test<FILE*>(filenames, 3);
-	//line_reader::test::test<std::wifstream*>(filenames, 3);
-	//line_reader::test::test<std::ifstream*>(filenames, 3);
-	/*ordened_linked_map::test::test_string_comparation();
+void sanity_tests(){
+	ordened_linked_map::test::test_string_comparation();
 	ordened_linked_map::test::test_edge_insertion(true);
 	ordened_linked_map::test::test_check_edge();
 	ordened_linked_map::test::test_psearch_int();
 	ordened_linked_map::test::test_foc_int();
 	ordened_linked_map::test::test_psearch_wstring();
-	ordened_linked_map::test::test_foc_wstring();*/
-	/*word_counter::test::simple_test();
-	word_counter::test::test_destructor();*/
-	//word_parse::test::simple_test();
+	ordened_linked_map::test::test_foc_wstring();
+	word_counter::test::simple_test();
+	word_counter::test::test_destructor();
+	word_parse::test::simple_test();
+}
+void present_testname(const char* testname) {
+	std::wcout << "--------------------------------------";
+	std::wcout << " TEST ";
+	std::wcout << "--------------------------------------" << std::endl;
+	std::wcout << "         " << testname << std::endl;
+	std::wcout << "--------------------------------------";
+	std::wcout << " TEST ";
+	std::wcout << "--------------------------------------" << std::endl;
+}
+void interactive_tests() {
+	const char* filenames[3] = { 
+		"test1.txt", "test2.txt", "invalid.txt"
+	};
+	present_testname("[LINE_READER] @test<FILE*>");
+	line_reader::test::test<FILE*>(filenames, 3);
+	present_testname("[LINE_READER] @test<wifstream*>");
+	line_reader::test::test<std::wifstream*>(filenames, 3);
+	present_testname("[LINE_READER] @test<ifstream*>");
+	line_reader::test::test<std::ifstream*>(filenames, 3);
+	present_testname("[WORD_PARSE] @echo<wchar_t>");
 	word_parse::test::echo_test<wchar_t>();
 }
 /*
@@ -1497,6 +1512,7 @@ namespace project {
 	namespace LR = line_reader;
 	namespace WC = word_counter;
 	namespace WP = word_parse;
+	using IO = std::ios_base;
 	using counter_t = WC::WordCounter<std::wstring>;
 	using parse_t = WP::wparse<wchar_t>;
 	// prototypes
@@ -1506,7 +1522,7 @@ namespace project {
 	template<typename source_t>
 	void process_file(counter_t* counter, source_t source);
 	template<typename source_t>
-		void main(const char** names, const size_t amount);
+		void entry_point(const char** names, const size_t amount);
 	// entry point
 	template<typename source_t>
 	void entry_point(const char** names, size_t amount){
@@ -1520,9 +1536,15 @@ namespace project {
 			
 		LR::close_file(&state); // close the underlaying file, if it is opened.
 		if(LR::isalive(&state)) { // iteration is poisoned and is alive
-			std::wcout << "Invalid Input" << std::endl;
+			std::wcout << "Entrada inválida!" << std::endl;
 		} else { // sucess
-			WC::print_counter(&counter, std::wcout);
+			#ifndef __PIPE_TO_STDOUT__
+				IO::openmode mode = IO::out | IO::trunc;
+				std::wfstream output = std::wfstream("resultado.out", mode);
+				WC::print_counter(&counter, output);
+			#else
+				WC::print_counter(&counter, std::wcout);
+			#endif
 		}
 		WC::destroy_counter(&counter);
 	}
@@ -1595,7 +1617,12 @@ int main(int argc, char** argv) {
 	std::wcout.imbue( std::locale("") );
 	//setlocale(LC_ALL, "");
 	std::wcout << L"";
-	//tests();
+	#ifdef __SANITY_TESTS__
+		sanity_tests();
+	#endif
+	#ifdef __INTERACTIVE_TESTS__
+		interactive_tests();
+	#endif
 	//project::tests::simplest();
 	proxy_call(argc, (const char**)argv);
 	return 0;
