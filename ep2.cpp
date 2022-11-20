@@ -1582,7 +1582,7 @@ namespace project {
 			
 		LR::close_file(&state); // close the underlaying file, if it is opened.
 		if(LR::isalive(&state)) { // iteration is poisoned and is alive
-			std::wcout << "Entrada inválida!" << std::endl;
+			std::wcout << L"Entrada inválida!" << std::endl;
 		} else { // sucess
 			#ifndef __PIPE_TO_STDOUT__
 				IO::openmode mode = IO::out | IO::trunc;
@@ -1666,11 +1666,12 @@ int main(int argc, char** argv) {
 	#ifdef __SANITY_TESTS__
 		sanity_tests();
 	#endif
+	proxy_call(argc, (const char**)argv);
 	#ifdef __INTERACTIVE_TESTS__
 		interactive_tests();
 	#endif
 	//project::tests::simplest();
-	proxy_call(argc, (const char**)argv);
+	
 	return 0;
 }
 /*
