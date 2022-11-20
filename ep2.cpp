@@ -201,7 +201,8 @@ namespace line_reader {
 			std::wcout << std::endl << "@=========@ end @=========@" << std::endl;
 			close_file(&state); // close the underlaying file, if it is opened.
 			if(isalive(&state))  // iteration is poisoned and is alive
-				std::wcout << "Invalid File: " << get_filename(&state) << std::endl << std::endl;
+				std::wcout << "Invalid File: " << get_filename(&state) << std::endl;
+			std::wcout << std::flush << std::endl;
 		}
 		/*
 		Prints the name of actual file.
@@ -1219,38 +1220,31 @@ namespace word_parse {
 	namespace test {
 		void simple_test() {
 			const wchar_t* message = L"Hello my old friend! It's almost 18:00 o'clock\n";
+			const wchar_t* expected[] = {
+				L"Hello", L"my", L"old", L"friend", L"It", L"s", L"almost", L"18", L"00",
+				L"o", L"clock"
+			};
+			size_t position = 0;
 			wparse<wchar_t> state;
 			initialize(&state, 256);
 			feed(&state, message, wcslen(message));
-			std::wcout << message;
+			#ifdef __VERBOSE_TESTS__
+				std::wcout << message;
+			#endif
 			while(is_not_empty(&state)) {
 				std::wstring* word = read_word(&state, nullptr);
-				std::wcout << ": " << *word << std::endl;
+				#ifdef __VERBOSE_TESTS__
+					std::wcout << ": " << *word << std::endl;
+				#endif
+				assert(*word == std::wstring(expected[position]));
+				assert(position < 11);
+				position++;
 				delete word;
 				ignore(&state);
 			}
 			destroy_state(&state);
 		}
-		/*void echo_fixed() {
-			wparse state;
-			const int bsize = 8;
-			initialize(&state, bsize);
-			wchar_t buffer[bsize];
-			while(true) {
-				//std::wcout << ">> "; // print the prompt
-				if(getword::get_rawword(&std::wcin, buffer, bsize)) // read a line into buffer
-					break; // stop if fail bit or bad bit is setted
-				feed(&state, buffer, bsize); // feed the state machine
-				while(is_not_empty(&state)) {
-					wchar_t* word = read_word(&state); // take one word from state machine
-					if(word == nullptr)
-						break;
-					std::wcout << word << std::endl; // print the word
-					delete[] word; // free allocated space to word
-					ignore(&state); // ignore bad character from state machine
-				}
-			}
-		}*/
+		
 		template<typename charT>
 		void echo_test(charT end_in, std::basic_ostream<charT>& into, std::basic_istream<charT>& _from) {
 			wparse<charT> state;
@@ -1411,7 +1405,7 @@ namespace word_counter {
 				delete pkeys[i];
 		}
 		void test_destructor(){
-			std::wstring* pkeys[26];
+			std::wstring* pkeys[27];
 			WordCounter<std::wstring> counter;
 			const wchar_t* keys[] = {
 				L"Hello", L"my", L"darling", L"friend.", // 4
@@ -1488,8 +1482,6 @@ void interactive_tests() {
 	line_reader::test::test<FILE*>(filenames, 3);
 	present_testname("[LINE_READER] @test<wifstream*>");
 	line_reader::test::test<std::wifstream*>(filenames, 3);
-	present_testname("[LINE_READER] @test<ifstream*>");
-	line_reader::test::test<std::ifstream*>(filenames, 3);
 	present_testname("[WORD_PARSE] @echo<wchar_t>");
 	word_parse::test::echo_test<wchar_t>();
 }
