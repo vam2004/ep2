@@ -15,6 +15,10 @@
 	#define __SHOW_IF_FOUND_INSERTION__
 	#define __SHOW_SEARCHING__
 #endif
+
+#ifdef __VERBOSE_TESTS__
+	#define __SANITY_TESTS__
+#endif
 // encapuslate lineReader into a namespace
 namespace line_reader {
 	template<typename source_t>
@@ -1285,6 +1289,16 @@ namespace word_counter {
 	namespace LLDE = ordened_linked_map; 
 	namespace NodeIterator = LLDE::NodeIterator;
 	template<typename word_t>
+		using cmap_t = LLDE::OrdenedLinkedMap<word_t, size_t>;
+	template<typename word_t>
+		using cnode_t = LLDE::Node<std::wstring, size_t>;
+	using std::basic_string;
+	using std::basic_ostream;
+	template<typename charT>
+		using bstring = basic_string<charT>;
+	template<typename charT>
+		using bostream = basic_ostream<charT>;
+	template<typename word_t>
 	struct WordCounter {
 		LLDE::OrdenedLinkedMap<word_t, size_t>* list; // the double linked map
 		size_t src_id; // the actual index of counter
@@ -1341,17 +1355,21 @@ namespace word_counter {
 		}
 			
 	}
+	template<typename charT> 
+	void print_cnode(cnode_t<bstring<charT>>* node, size_t amount, bostream<charT>& into) {
+		into << *node->key;
+		size_t* counter_map = node->value;
+		for(size_t i = 0; i < amount; i++)
+			into << " "  << counter_map[i];
+		into << std::endl;
+	}
 	template<typename charT>
-	void print_counter(WordCounter<std::basic_string<charT>>* counter, std::basic_ostream<charT>& into) {
-		NodeIterator::NodeIterator<std::wstring, size_t> state;
+	void print_counter(WordCounter<bstring<charT>>* counter, bostream<charT>& into) {
+		NodeIterator::NodeIterator<bstring<charT>, size_t> state;
 		NodeIterator::create(&state, counter->list->first);
 		while(NodeIterator::isalive(&state)) {
-			LLDE::Node<std::wstring, size_t>* now = NodeIterator::next(&state);
-			into << *now->key;
-			size_t* counter_map = now->value;
-			for(size_t i = 0, size = counter->src_id; i < size; i++)
-				into << " "  << counter_map[i];
-			into << std::endl;
+			LLDE::Node<bstring<charT>, size_t>* now = NodeIterator::next(&state);
+			print_cnode(now, counter->src_id, into);
 		}
 	}
 	template<typename word_t, bool keep_key = false>
@@ -1372,17 +1390,38 @@ namespace word_counter {
 			std::wstring* pkeys[27];
 			WordCounter<std::wstring> counter;
 			const wchar_t* keys[] = {
-				L"Hello", L"my", L"darling", L"friend.", // 4
+				L"hello", L"my", L"darling", L"friend.", // 4
 				L"would", L"you", L"like", L"to", L"hang", // 9
 				L"out", L"a", L"bit", L"more?", //13
 				L"would", L"you", L"enjoy", L"to", L"be", L"out", //19
 				L"a", L"bit", L"more?", L"even", L"if", L"take", L"one", // 26
 				L"hour?"
 			};
-			
 			for(size_t i = 0; i < 27; i++)
 				pkeys[i] = new std::wstring(keys[i]);
-			
+			const bool insertions_result[] = {
+				false, false, false, false,
+				false, false, false, false, false,
+				false, false, false, false, 
+				true, true, false, true, false, true, 
+				true, true, true, false, false, false, false, 
+				false
+			};
+			const wchar_t* result_ordering[] = {
+				L"a", L"be", L"bit", L"darling", 
+				L"enjoy", L"even", L"friend.",  L"hang", 
+				L"hello", L"hour?", L"if", L"like", 
+				L"more?",L"my", L"one", L"out", 
+				L"take", L"to", L"would", L"you"
+			};
+			const size_t result_counter[20][2] = {
+				{1, 1}, {0, 1}, {1, 1}, {1, 0},
+				{0, 1}, {0, 1}, {1, 0}, {1, 0},
+				{1, 0}, {0, 1}, {0, 1}, {1, 0},
+				{0, 2}, {1, 0}, {0, 1}, {1, 1},
+				{0, 1}, {1, 1}, {1, 1}, {1, 1},
+			};
+			#ifdef __VERBOSE_TESTS__
 			std::wcout << "========== text ==========" << std::endl;
 			for(size_t i = 0; i < 12; i++)
 				std::wcout << *pkeys[i] << " ";
@@ -1390,15 +1429,30 @@ namespace word_counter {
 			for(size_t i = 12; i < 27; i++)
 				std::wcout << *pkeys[i] << " ";
 			std::wcout << std::endl << "========== text ==========" << std::endl;
+			#endif
 			
 			initialize(&counter, 2);
 			for(size_t i = 0; i < 12; i++)
-				insert_word(&counter, pkeys[i]);
+				assert(insert_word(&counter, pkeys[i]) == insertions_result[i]);
 			next_source(&counter);
 			for(size_t i = 12; i < 27; i++)
-				insert_word(&counter, pkeys[i]);
+				assert(insert_word(&counter, pkeys[i]) == insertions_result[i]);
+			next_source(&counter);
 			
-			print_counter(&counter, std::wcout);
+			size_t position = 0;
+			NodeIterator::NodeIterator<std::wstring, size_t> it_state;
+			NodeIterator::create(&it_state, counter.list->first);
+			while(NodeIterator::isalive(&it_state)) {
+				LLDE::Node<std::wstring, size_t>* now = NodeIterator::next(&it_state);
+				#ifdef __VERBOSE_TESTS__
+				print_cnode(now, counter.src_id, std::wcout);
+				#endif
+				assert(*now->key == std::wstring(result_ordering[position]));
+				for(size_t i = 0, *arr = now->value; i < 2; i++)
+					assert(arr[i] == result_counter[position][i]);
+				position++;
+			}
+			
 			destroy_counter<std::wstring, true>(&counter);
 			
 			for(size_t i = 0; i < 27; i++)
@@ -1458,8 +1512,8 @@ void sanity_tests(){
 	ordened_linked_map::test::test_edge_insertion(true);
 	ordened_linked_map::test::test_check_edge();
 	ordened_linked_map::test::test_psearch_int();
-	ordened_linked_map::test::test_foc_int();
 	ordened_linked_map::test::test_psearch_wstring();
+	ordened_linked_map::test::test_foc_int();
 	ordened_linked_map::test::test_foc_wstring();
 	word_counter::test::simple_test();
 	word_counter::test::test_destructor();
