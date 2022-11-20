@@ -8,6 +8,9 @@ With either `-O1`, `-O2` or `-O3`, if some otimizations are desidered. And it al
 g++ -g -Wall -fstack-protector-all -fsanitize=undefined,leak,address -o ep2 ep2.cpp
 
 Which should be the same effect as the previuos compilation, except that will be slower.
+# Supported operating systems
+The following operating systems are tested with pre-stable and stable version:
+- Debian 5.10.149-2 x86_64 GNU/Linux (Linux 5.10.0-19-amd64) 
 # Pre-stable requirements
 The first requiment to mark the program as pre-stable is that it compiles in standart testing mode without warnings. And it also shouldn't generate major warnings when compile with `-Wextra`. 
 
