@@ -1,3 +1,5 @@
+
+
 //#define __STDC_WANT_LIB_EXT1_ 1
 #include <iostream>
 #include <locale>
@@ -8,6 +10,7 @@
 #include <wchar.h>
 #include <wctype.h>
 #include <codecvt>
+#include <vector> 
 //debugging flags
 #ifdef __DEBUG_INSERTIONS__
 	#define __SHOW_COMPARATIONS__
@@ -207,6 +210,63 @@ namespace line_reader {
 			if(isalive(&state))  // iteration is poisoned and is alive
 				std::wcout << "Invalid File: " << get_filename(&state) << std::endl;
 			std::wcout << std::flush << std::endl;
+		}
+		void interactive() {
+			std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
+			bool active = true;
+			while(active) {
+				std::wcout << "Filenames: (end selection with '*')" << std::endl;
+				std::vector<std::string*> vlist;
+				std::wstring wbuffer; 
+				while(std::wcin >> wbuffer) {
+					if(wbuffer == L"*") {
+						active = !active;
+						break;
+					}
+						
+					std::string buffer = converter.to_bytes(wbuffer);
+					std::string* filename = new std::string;
+					filename->swap(buffer);
+					vlist.push_back(filename);
+				}
+				active = !active;
+				const size_t amount = vlist.size();
+				const char** clist = new const char*[amount];
+				for(size_t i = 0; i < amount; i++) {
+					clist[i] = vlist[i]->c_str();
+				}
+				if(active) {
+					std::wcout << "select input mode:" << std::endl;
+					std::wcout << "\t [1] FILE*" << std::endl;
+					std::wcout << "\t [2] ifstream*"  << std::endl;
+					std::wcout << "\t [3] wifstream*"  << std::endl;
+					int mode;
+					if(std::wcin >> mode) {
+						std::wcout << "\n\n\n\n\n\n";
+						switch(mode) {
+							case 1:
+								test<FILE*>(clist, amount);
+								break;
+							case 2:
+								test<std::ifstream*>(clist, amount);
+								break;
+							case 3:
+								test<std::wifstream*>(clist, amount);
+								break;
+							default:
+								active = false;
+						}
+						std::wcout << "\n\n\n";
+					} 
+				} else {
+					active = false;
+				}
+				for(size_t i = 0; i < amount; i++)
+					delete vlist[i];
+				delete[] clist;
+			}
+			
+			
 		}
 		/*
 		Prints the name of actual file.
@@ -870,6 +930,20 @@ namespace ordened_linked_map {
 			for(size_t i = 0; i < 9; i++)
 				delete text[i];
 		}
+		void interactive_tests_string_comparation() {
+			std::wstring src[2];
+			for(size_t parity = 0; true; parity = 1 - parity) {
+				const wchar_t* side = parity ? L"right" : L"left";
+				std::wcout << L">> (" << side << L"): ";
+				if(!(std::wcin >> src[parity]))
+					break;
+				if(parity) {
+					std::wcout << "\t";
+					show_cmp_wstring(src, src + 1);
+				}
+			}
+			std::cout << std::endl;
+		}
 		template<typename key_t, typename value_t>
 		void clear_nodes(size_t amount, Node<key_t, value_t>** nodes) {
 			for(size_t i = 0; i < amount; i++)
@@ -1508,8 +1582,12 @@ namespace stateview {
 	}
 }
 void sanity_tests(){
-	ordened_linked_map::test::test_string_comparation();
-	ordened_linked_map::test::test_edge_insertion(true);
+	#ifdef __VERBOSE_TESTS__
+		const bool debug = true;
+	#else
+		const bool debug = false;
+	#endif
+	ordened_linked_map::test::test_edge_insertion(debug);
 	ordened_linked_map::test::test_check_edge();
 	ordened_linked_map::test::test_psearch_int();
 	ordened_linked_map::test::test_psearch_wstring();
@@ -1528,7 +1606,7 @@ void present_testname(const char* testname) {
 	std::wcout << " TEST ";
 	std::wcout << "--------------------------------------" << std::endl;
 }
-void interactive_tests() {
+void readfile_tests() {
 	const char* filenames[3] = { 
 		"test1.txt", "test2.txt", "invalid.txt"
 	};
@@ -1536,8 +1614,18 @@ void interactive_tests() {
 	line_reader::test::test<FILE*>(filenames, 3);
 	present_testname("[LINE_READER] @test<wifstream*>");
 	line_reader::test::test<std::wifstream*>(filenames, 3);
+}
+void interactive_tests() {
+	#if defined __TEST_STRING_COMPARATION__
+	present_testname("[ORDENED_LINKED_LIST] @interactive_tests_string_comparation");
+	ordened_linked_map::test::interactive_tests_string_comparation();
+	#elif defined __TEST_STRING_READING__
 	present_testname("[WORD_PARSE] @echo<wchar_t>");
 	word_parse::test::echo_test<wchar_t>();
+	#elif defined __TEST_FILE_INPUT__
+	present_testname("[READ_LINE] @echo<wchar_t>");
+	line_reader::test::interactive();
+	#endif
 }
 /*
 	Converts a C wide null-terminated string to lower case.
@@ -1667,9 +1755,7 @@ int main(int argc, char** argv) {
 		sanity_tests();
 	#endif
 	proxy_call(argc, (const char**)argv);
-	#ifdef __INTERACTIVE_TESTS__
-		interactive_tests();
-	#endif
+	interactive_tests();
 	//project::tests::simplest();
 	
 	return 0;
