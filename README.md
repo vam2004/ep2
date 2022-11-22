@@ -5,7 +5,7 @@ First, make sure to clone the stable or pre-stable version of program. Then the 
 
 With either `-O1`, `-O2` or `-O3`, if some otimizations are desidered. And it also can be compiled in standart testing mode using:
 
-g++ -g -Wall -fstack-protector-all -fsanitize=undefined,leak,address -o ep2 ep2.cpp
+	g++ -g -Wall -fstack-protector-all -fsanitize=undefined,leak,address -o ep2 ep2.cpp
 
 Which should be the same effect as the previuos compilation, except that will be slower.
 # Supported operating systems
